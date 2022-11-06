@@ -4,4 +4,5 @@ from main import views
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path("new/", views.SubscriptionCreateView.as_view(), name="new"),
 ]
