@@ -1,0 +1,74 @@
+{% extends 'main/layout.html' %}
+
+{% load static %}
+
+{% block content %}
+<header>
+    <a href="#">
+        <h1>Alcman Reader</h1>
+    </a>
+</header>
+
+<section id="search">
+    <form>
+        <input type="text" placeholder="Search all content">
+        <input type="submit" value="search">
+    </form>
+</section>
+
+<main>
+    <div class="main-status">
+        All up-to-date. Last check at 02:12:33
+    </div>
+    <div class="main-articles">
+        <div class="main-articles-item">
+            <div class="main-articles-item-blog">Drew DeVault</div>
+            <div class="main-articles-item-title">
+                Notes from kernel hacking in Hare
+            </div>
+            <div class="main-articles-item-">8:22 AM</div>
+        </div>
+        <div class="main-articles-item">
+            <div class="main-articles-item-blog">Drew DeVault</div>
+            <div class="main-articles-item-title">
+                Notes from kernel hacking in Hare
+            </div>
+            <div class="main-articles-item-">8:22 AM</div>
+        </div>
+        <div class="main-articles-item">
+            <div class="main-articles-item-blog">Drew DeVault</div>
+            <div class="main-articles-item-title">
+                Notes from kernel hacking in Hare
+            </div>
+            <div class="main-articles-item-">8:22 AM</div>
+        </div>
+        <div class="main-articles-item">
+            <div class="main-articles-item-blog">Drew DeVault</div>
+            <div class="main-articles-item-title">
+                Notes from kernel hacking in Hare
+            </div>
+            <div class="main-articles-item-">8:22 AM</div>
+        </div>
+    </div>
+</main>
+
+<aside>
+    <div class="sidebar-tools">
+        <a href="{% url 'new' %}">Subscribe +</a>
+    </div>
+    <div class="sidebar-blogs">
+        <a href="">Drew DeVault</a>
+        <a href="">Alpha</a>
+        <a href="">Beta Gamma</a>
+        <a href="">A List Apart</a>
+        <a href="">Hania Rani</a>
+        <a href="">HESA </a>
+        <a href="">Drew DeVault</a>
+        <a href="">Alpha</a>
+        <a href="">Beta Gamma</a>
+        <a href="">A List Apart</a>
+        <a href="">Hania Rani</a>
+        <a href="">HESA </a>
+    </div>
+</aside>
+{% endblock %}
