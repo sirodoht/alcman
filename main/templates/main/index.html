@@ -1,74 +1,37 @@
 {% extends 'main/layout.html' %}
 
-{% load static %}
-
 {% block content %}
-<header>
-    <a href="#">
-        <h1>Alcman Reader</h1>
-    </a>
-</header>
-
-<section id="search">
-    <form>
-        <input type="text" placeholder="Search all content">
-        <input type="submit" value="search">
-    </form>
-</section>
-
-<main>
-    <div class="main-status">
-        All up-to-date. Last check at 02:12:33
+<div class="main-status">
+    <div class="main-status-left">
+        {% if subscription %}
+        Showing: {{ subscription.title }} — {{ subscription.url }}
+        {% else %}
+        All items
+        {% endif %}
     </div>
-    <div class="main-articles">
-        <div class="main-articles-item">
-            <div class="main-articles-item-blog">Drew DeVault</div>
-            <div class="main-articles-item-title">
-                Notes from kernel hacking in Hare
-            </div>
-            <div class="main-articles-item-">8:22 AM</div>
-        </div>
-        <div class="main-articles-item">
-            <div class="main-articles-item-blog">Drew DeVault</div>
-            <div class="main-articles-item-title">
-                Notes from kernel hacking in Hare
-            </div>
-            <div class="main-articles-item-">8:22 AM</div>
-        </div>
-        <div class="main-articles-item">
-            <div class="main-articles-item-blog">Drew DeVault</div>
-            <div class="main-articles-item-title">
-                Notes from kernel hacking in Hare
-            </div>
-            <div class="main-articles-item-">8:22 AM</div>
-        </div>
-        <div class="main-articles-item">
-            <div class="main-articles-item-blog">Drew DeVault</div>
-            <div class="main-articles-item-title">
-                Notes from kernel hacking in Hare
-            </div>
-            <div class="main-articles-item-">8:22 AM</div>
-        </div>
+    <div class="main-status-right">
+        {% if request.user.sync_ongoing %}
+        Sync started at {{ request.user.synced_at }}
+        {% else %}
+        All up-to-date. Last sync at {{ request.user.synced_at }}
+        {% endif %}
     </div>
-</main>
-
-<aside>
-    <div class="sidebar-tools">
-        <a href="{% url 'new' %}">Subscribe +</a>
+</div>
+<div class="main-articles">
+    {% for article in article_list %}
+    <div class="main-articles-item">
+        <div class="main-articles-item-blog">
+            <a href="{% url 'subscription' article.subscription.slug %}">
+                {{ article.subscription.title }}
+            </a>
+        </div>
+        <div class="main-articles-item-title">
+            <a href="{% url 'article' article.slug %}">
+                {{ article.title }}
+            </a>
+        </div>
+        <div class="main-articles-item-date">{{ article.published_at }}</div>
     </div>
-    <div class="sidebar-blogs">
-        <a href="">Drew DeVault</a>
-        <a href="">Alpha</a>
-        <a href="">Beta Gamma</a>
-        <a href="">A List Apart</a>
-        <a href="">Hania Rani</a>
-        <a href="">HESA </a>
-        <a href="">Drew DeVault</a>
-        <a href="">Alpha</a>
-        <a href="">Beta Gamma</a>
-        <a href="">A List Apart</a>
-        <a href="">Hania Rani</a>
-        <a href="">HESA </a>
-    </div>
-</aside>
+    {% endfor %}
+</div>
 {% endblock %}

@@ -27,7 +27,40 @@
         </aside>
         {% endif %}
 
-        {% block content %}
-        {% endblock %}
+        <header>
+            <a href="{% url 'index' %}">
+                <h1>Alcman Reader</h1>
+            </a>
+        </header>
+
+        <section id="search">
+            <form>
+                <input type="text" placeholder="Search all content">
+                <input type="submit" value="search">
+            </form>
+        </section>
+
+        <main>
+            {% block content %}
+            {% endblock %}
+        </main>
+
+        <aside>
+            <div class="sidebar-tools">
+                <a href="{% url 'new' %}">Subscribe +</a>
+            </div>
+            <div class="sidebar-blogs">
+                <a href="{% url 'index' %}">All items</a>
+                <br>
+                {% for subscription in subscription_list %}
+                <a href="{% url 'subscription' subscription.slug %}">
+                    {{ subscription.title }}
+                </a>
+                {% endfor %}
+            </div>
+            <div class="sidebar-footer">
+                pre-alpha software
+            </div>
+        </aside>
     </body>
 </html>

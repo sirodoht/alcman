@@ -149,10 +149,12 @@ summary {
 /* general */
 :root {
     --light-grey: #f5f5f5;
+    --dark-grey: #888;
 }
 
 html {
     height: 100%;
+    width: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
@@ -160,9 +162,11 @@ html {
 
 body {
     height: 100%;
+    width: 100%;
     margin: 0;
     padding: 0;
     overflow: hidden;
+    font-family: sans-serif;
     display: grid;
     grid-template-rows: 80px auto;
     grid-template-columns: 160px auto;
@@ -176,6 +180,39 @@ a {
 
 a:hover {
     text-decoration: underline;
+}
+
+/* form specific */
+label {
+    display: block;
+    margin-top: 16px;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+input[type="submit"] {
+    display: block;
+    padding: 6px 16px;
+    cursor: pointer;
+    color: #000;
+    background: #fff;
+    border: 1px solid #000;
+}
+
+input[type="submit"]:hover {
+    background: var(--dark-grey);
+}
+
+textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 5px solid var(--light-grey);
 }
 
 /* architecture */
@@ -197,10 +234,13 @@ header {
 main {
     grid-column: 2;
     grid-row: 2;
+    overflow-y: hidden;
 }
 
 aside {
     grid-column: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 /* header specific */
@@ -210,24 +250,67 @@ h1 {
 }
 
 /* main specific */
+.main-status {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 16px;
+}
+
 .main-articles {
     margin-top: 16px;
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 8px;
 }
 
 .main-articles-item {
     display: grid;
     grid-template-columns: 300px auto 200px;
     grid-gap: 8px;
-    padding: 8px 0;
+    padding: 16px 16px;
+    background: var(--light-grey);
+    margin-bottom: 8px;
+}
+
+.main-articles-item:last-child {
+    /* no idea why I need this offset */
+    margin-bottom: 64px;
+}
+
+.main-articles-item-date {
+    text-align: right;
+}
+
+.main-new {
+    width: 500px;
+}
+
+.main-new h1 {
+    margin-top: 4px;
+}
+
+.main-single {
+    line-height: 1.5;
+    height: 100%;
+    overflow-y: auto;
+    padding-bottom: 64px;
+    padding-right: 16px;
+}
+
+.main-single-body {
+    padding-bottom: 64px;
+}
+
+.main-single-body p {
+    width: 600px;
+}
+
+.main-single-body img {
+    width: 100%;
 }
 
 /* aside sidebar specific */
-.sidebar-tools {
-    margin-bottom: 32px;
-    padding-left: 8px;
-}
-
-.sidebar-blogs a {
+aside a {
     display: block;
     line-height: 1.8;
     padding-left: 8px;
@@ -235,6 +318,29 @@ h1 {
     text-decoration: none;
 }
 
-.sidebar-blogs a:hover {
+aside a:hover {
     background: var(--light-grey);
+    text-decoration: none;
+}
+
+.sidebar-tools {
+    margin-bottom: 32px;
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding-left: 8px;
+    padding-bottom: 8px;
+    font-size: 14px;
+    color: var(--dark-grey);
+}
+
+/* search bar specific */
+#search form input[type="text"] {
+    width: 400px;
+    margin-right: 8px;
+}
+
+#search form {
+    display: flex;
 }
