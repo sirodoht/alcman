@@ -1,5 +1,12 @@
-<form method="post">
-    {{ form.as_p }}
-    {% csrf_token %}
-    <input type="submit" value="Save">
-</form>
+{% extends 'main/layout.html' %}
+
+{% block content %}
+<div class="main-new">
+    <h1>Subscribe to a blog</h1>
+    <form method="post">
+        {{ form.as_p }}
+        {% csrf_token %}
+        <input type="submit" value="save">
+    </form>
+</div>
+{% endblock %}
