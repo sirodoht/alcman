@@ -10,14 +10,18 @@ class UserAdmin(DjUserAdmin):
         "id",
         "username",
         "email",
+        "sync_ongoing",
+        "synced_at",
         "date_joined",
         "last_login",
     )
     list_display_links = ("id", "username")
 
     fieldsets = (
-        (None, {"fields": ("username", "password")}),
-        ("Personal info", {"fields": ("full_name", "email")}),
+        (
+            None,
+            {"fields": ("username", "password", "email", "sync_ongoing", "synced_at")},
+        ),
         (
             "Permissions",
             {
@@ -32,6 +36,33 @@ class UserAdmin(DjUserAdmin):
         ),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
-    search_fields = ("username", "full_name", "email")
+    search_fields = ("username", "email")
+
+    ordering = ["-id"]
+
+
+@admin.register(models.Subscription)
+class SubscriptionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "slug",
+        "url",
+        "user",
+        "updated_at",
+    )
+
+    ordering = ["-id"]
+
+
+@admin.register(models.Article)
+class ArticleAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "url",
+        "subscription",
+        "published_at",
+        "created_at",
+    )
 
     ordering = ["-id"]
