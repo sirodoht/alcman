@@ -70,22 +70,43 @@ pub struct CreateRecordResponse {
     pub cid: String,
 }
 
+/// Response from com.atproto.repo.listRecords
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListRecordsResponse<T> {
+    pub records: Vec<RecordEntry<T>>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+}
+
+/// A single record entry from listRecords
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RecordEntry<T> {
+    pub uri: String,
+    pub cid: String,
+    pub value: T,
+}
+
 // ============================================================================
 // app.alcman.book.entry Lexicon Types
 // ============================================================================
 
 /// Book metadata reference (bookRef in the lexicon)
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BookRef {
     pub title: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authors: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publication_year: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub isbn: Option<String>,
 }
 
 /// A user's book entry record (app.alcman.book.entry)
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct BookEntryRecord {
     /// Record type identifier
@@ -94,16 +115,16 @@ pub struct BookEntryRecord {
     /// Book metadata
     pub book: BookRef,
     /// User's notes about the book
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
     /// Reading status
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
     /// When the user started reading
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub started_at: Option<String>,
     /// When the user finished reading
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished_at: Option<String>,
     /// When this entry was created
     pub created_at: String,
@@ -318,5 +339,51 @@ impl PdsClient {
         let record = BookEntryRecord::new(book, notes);
         self.create_record(access_jwt, did, "app.alcman.book.entry", record)
             .await
+    }
+
+    /// List records from a user's repository.
+    ///
+    /// Calls com.atproto.repo.listRecords (public, no auth required)
+    pub async fn list_records<T: serde::de::DeserializeOwned>(
+        &self,
+        repo: &str,
+        collection: &str,
+        limit: Option<u32>,
+    ) -> AtprotoResult<ListRecordsResponse<T>> {
+        let mut url = format!(
+            "{}/xrpc/com.atproto.repo.listRecords?repo={}&collection={}",
+            self.pds_url, repo, collection
+        );
+
+        if let Some(limit) = limit {
+            url.push_str(&format!("&limit={}", limit));
+        }
+
+        let response = self.client.get(&url).send().await?;
+
+        if response.status().is_success() {
+            let result: ListRecordsResponse<T> = response.json().await?;
+            Ok(result)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// List book entries from a user's repository.
+    pub async fn list_book_entries(
+        &self,
+        did: &str,
+    ) -> AtprotoResult<Vec<RecordEntry<BookEntryRecord>>> {
+        let response: ListRecordsResponse<BookEntryRecord> = self
+            .list_records(did, "app.alcman.book.entry", Some(100))
+            .await?;
+        Ok(response.records)
     }
 }

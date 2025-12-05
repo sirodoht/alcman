@@ -318,7 +318,17 @@ pub async fn profile_by_did_page(
         }
     };
 
-    let book_count = db.get_book_count().await.unwrap_or(0);
+    // Fetch book entries from PDS
+    let book_entries = match PdsClient::from_env() {
+        Some(pds_client) => match pds_client.list_book_entries(&did).await {
+            Ok(entries) => entries,
+            Err(error) => {
+                eprintln!("Error fetching book entries from PDS: {error}");
+                vec![]
+            }
+        },
+        None => vec![],
+    };
 
     // Current user's username for nav (empty if not logged in)
     let current_username = current
@@ -332,7 +342,7 @@ pub async fn profile_by_did_page(
         username: current_username,
         profile_username: profile_user.username,
         profile_did: profile_user.did,
-        book_count,
+        book_entries,
     };
 
     Html(template.render().unwrap()).into_response()

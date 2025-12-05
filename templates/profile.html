@@ -20,13 +20,6 @@
     </div>
     {% endif %}
 
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">books</span>
-            <span class="page-value">{{ book_count }}</span>
-        </div>
-    </div>
-
     {% if username == profile_username %}
     <div class="page-row">
         <div class="page-content page-actions">
@@ -36,6 +29,33 @@
             </form>
         </div>
     </div>
+    {% endif %}
+</section>
+
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h2>books ({{ book_entries.len() }})</h2>
+        </div>
+    </div>
+
+    {% if book_entries.is_empty() %}
+    <div class="page-row">
+        <div class="page-content">
+            <p>no books yet</p>
+        </div>
+    </div>
+    {% else %}
+    {% for entry in book_entries %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">{{ entry.value.book.title }}{% if let Some(year) = entry.value.book.publication_year %} ({{ year }}){% endif %}</span>
+            {% if let Some(authors) = entry.value.book.authors %}
+            <span class="page-value">{{ authors.join(", ") }}</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
     {% endif %}
 </section>
 {% endblock content %}

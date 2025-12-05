@@ -93,7 +93,8 @@ pub struct ProfileTemplate {
     pub profile_username: String,
     /// Profile owner's DID
     pub profile_did: Option<String>,
-    pub book_count: i64,
+    /// Book entries from the PDS
+    pub book_entries: Vec<crate::atproto::RecordEntry<crate::atproto::BookEntryRecord>>,
 }
 
 #[derive(Template)]

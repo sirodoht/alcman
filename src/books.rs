@@ -166,7 +166,14 @@ pub async fn book_create(
     match db.create_book(title, author, publication_year, notes).await {
         Ok(_) => {
             // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(&user, title, author, notes.map(String::from)).await;
+            sync_book_to_pds(
+                &user,
+                title,
+                author,
+                publication_year,
+                notes.map(String::from),
+            )
+            .await;
             Redirect::to("/").into_response()
         }
         Err(error) => {
@@ -184,7 +191,13 @@ pub async fn book_create(
 
 /// Sync a book entry to the user's AT Protocol PDS.
 /// Logs errors but does not propagate them.
-async fn sync_book_to_pds(user: &User, title: &str, author: Option<&str>, notes: Option<String>) {
+async fn sync_book_to_pds(
+    user: &User,
+    title: &str,
+    author: Option<&str>,
+    publication_year: Option<i32>,
+    notes: Option<String>,
+) {
     // Check if user has AT Protocol credentials
     let (Some(did), Some(access_jwt)) = (&user.did, &user.access_jwt) else {
         // User doesn't have AT Protocol credentials, skip sync
@@ -200,6 +213,7 @@ async fn sync_book_to_pds(user: &User, title: &str, author: Option<&str>, notes:
     let book_ref = BookRef {
         title: title.to_string(),
         authors: author.map(|a| vec![a.to_string()]),
+        publication_year,
         isbn: None,
     };
 
@@ -401,7 +415,14 @@ pub async fn quick_add_submit(
     {
         Ok(book_id) => {
             // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(&user, &metadata.title, metadata.author.as_deref(), None).await;
+            sync_book_to_pds(
+                &user,
+                &metadata.title,
+                metadata.author.as_deref(),
+                metadata.publication_year,
+                None,
+            )
+            .await;
             Redirect::to(&format!("/books/{}", book_id)).into_response()
         }
         Err(error) => {
@@ -542,9 +563,9 @@ pub async fn book_edit_notes_submit(
 ) -> Response {
     let user = current_user(&db, &headers).await;
 
-    if user.is_none() {
+    let Some(user) = user else {
         return Redirect::to("/login").into_response();
-    }
+    };
 
     let notes = if form.notes.trim().is_empty() {
         None
@@ -553,7 +574,20 @@ pub async fn book_edit_notes_submit(
     };
 
     match db.update_book_notes(&book_id, notes).await {
-        Ok(_) => Redirect::to(&format!("/books/{}", book_id)).into_response(),
+        Ok(_) => {
+            // Fetch the book to get full details for PDS sync
+            if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
+                sync_book_to_pds(
+                    &user,
+                    &book.title,
+                    book.author.as_deref(),
+                    book.publication_year,
+                    book.notes,
+                )
+                .await;
+            }
+            Redirect::to(&format!("/books/{}", book_id)).into_response()
+        }
         Err(error) => {
             eprintln!("Notes update error: {error}");
             Redirect::to(&format!("/books/{}", book_id)).into_response()

@@ -33,6 +33,7 @@ pub fn create_app(db: AppState) -> Router {
 
     Router::new()
         .route("/", get(book_list))
+        .route("/database", get(book_list))
         .route("/login", get(login_page).post(login_submit))
         .route("/signup", get(signup_page).post(signup_submit))
         .route("/logout", post(logout))
