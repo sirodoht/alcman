@@ -6,6 +6,10 @@ pub struct PdsClient {
     pds_url: String,
 }
 
+// ============================================================================
+// Account Management Types
+// ============================================================================
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAccountRequest {
@@ -28,9 +32,96 @@ pub struct CreateAccountResponse {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshSessionResponse {
+    pub access_jwt: String,
+    pub refresh_jwt: String,
+    pub handle: String,
+    pub did: String,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct XrpcError {
     pub error: String,
     pub message: Option<String>,
+}
+
+// ============================================================================
+// Record Management Types
+// ============================================================================
+
+/// Request to create a record via com.atproto.repo.createRecord
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRecordRequest<T: Serialize> {
+    /// The DID of the repo
+    pub repo: String,
+    /// The NSID of the record collection
+    pub collection: String,
+    /// The record to create
+    pub record: T,
+}
+
+/// Response from com.atproto.repo.createRecord
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRecordResponse {
+    pub uri: String,
+    pub cid: String,
+}
+
+// ============================================================================
+// app.alcman.book.entry Lexicon Types
+// ============================================================================
+
+/// Book metadata reference (bookRef in the lexicon)
+#[derive(Serialize, Clone)]
+pub struct BookRef {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authors: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub isbn: Option<String>,
+}
+
+/// A user's book entry record (app.alcman.book.entry)
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookEntryRecord {
+    /// Record type identifier
+    #[serde(rename = "$type")]
+    pub record_type: String,
+    /// Book metadata
+    pub book: BookRef,
+    /// User's notes about the book
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    /// Reading status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// When the user started reading
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// When the user finished reading
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
+    /// When this entry was created
+    pub created_at: String,
+}
+
+impl BookEntryRecord {
+    /// Create a new book entry record
+    pub fn new(book: BookRef, notes: Option<String>) -> Self {
+        Self {
+            record_type: "app.alcman.book.entry".to_string(),
+            book,
+            notes,
+            status: None,
+            started_at: None,
+            finished_at: None,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
 }
 
 pub type AtprotoResult<T> = Result<T, AtprotoError>;
@@ -142,5 +233,90 @@ impl PdsClient {
         }
 
         Ok(format!("{}.{}", username.to_lowercase(), domain))
+    }
+
+    /// Refresh an access token using a refresh token.
+    ///
+    /// Calls com.atproto.server.refreshSession
+    pub async fn refresh_session(
+        &self,
+        refresh_jwt: &str,
+    ) -> AtprotoResult<RefreshSessionResponse> {
+        let url = format!("{}/xrpc/com.atproto.server.refreshSession", self.pds_url);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", refresh_jwt))
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            let session: RefreshSessionResponse = response.json().await?;
+            Ok(session)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// Create a record in a user's repository.
+    ///
+    /// Calls com.atproto.repo.createRecord
+    pub async fn create_record<T: Serialize>(
+        &self,
+        access_jwt: &str,
+        repo: &str,
+        collection: &str,
+        record: T,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        let url = format!("{}/xrpc/com.atproto.repo.createRecord", self.pds_url);
+
+        let request = CreateRecordRequest {
+            repo: repo.to_string(),
+            collection: collection.to_string(),
+            record,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", access_jwt))
+            .json(&request)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            let result: CreateRecordResponse = response.json().await?;
+            Ok(result)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// Create a book entry record in a user's repository.
+    pub async fn create_book_entry(
+        &self,
+        access_jwt: &str,
+        did: &str,
+        book: BookRef,
+        notes: Option<String>,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        let record = BookEntryRecord::new(book, notes);
+        self.create_record(access_jwt, did, "app.alcman.book.entry", record)
+            .await
     }
 }

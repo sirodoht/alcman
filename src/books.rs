@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 use crate::AppState;
-use crate::auth::{current_user, signups_disabled};
+use crate::atproto::{BookRef, PdsClient};
+use crate::auth::{User, current_user, signups_disabled};
 use crate::gpt::{GptClient, GptConfig};
 use crate::templates::{
     BookDetailTemplate, BookEditChatTemplate, BookEditNotesTemplate, BookEditTemplate,
@@ -163,16 +164,56 @@ pub async fn book_create(
     };
 
     match db.create_book(title, author, publication_year, notes).await {
-        Ok(_) => Redirect::to("/").into_response(),
+        Ok(_) => {
+            // Sync book to PDS (don't fail if this errors)
+            sync_book_to_pds(&user, title, author, notes.map(String::from)).await;
+            Redirect::to("/").into_response()
+        }
         Err(error) => {
             eprintln!("Book creation error: {error}");
             let template = BookFormTemplate {
                 is_authenticated: true,
                 signups_disabled: signups_disabled(),
-                username: user.username,
+                username: user.username.clone(),
                 error_message: Some("Could not create book. Please try again.".to_string()),
             };
             Html(template.render().unwrap()).into_response()
+        }
+    }
+}
+
+/// Sync a book entry to the user's AT Protocol PDS.
+/// Logs errors but does not propagate them.
+async fn sync_book_to_pds(user: &User, title: &str, author: Option<&str>, notes: Option<String>) {
+    // Check if user has AT Protocol credentials
+    let (Some(did), Some(access_jwt)) = (&user.did, &user.access_jwt) else {
+        // User doesn't have AT Protocol credentials, skip sync
+        return;
+    };
+
+    let Some(pds_client) = PdsClient::from_env() else {
+        // PDS not configured
+        return;
+    };
+
+    // Create book reference
+    let book_ref = BookRef {
+        title: title.to_string(),
+        authors: author.map(|a| vec![a.to_string()]),
+        isbn: None,
+    };
+
+    // Create book entry on PDS
+    match pds_client
+        .create_book_entry(access_jwt, did, book_ref, notes)
+        .await
+    {
+        Ok(response) => {
+            println!("Synced book to PDS: {} (uri: {})", title, response.uri);
+        }
+        Err(error) => {
+            eprintln!("Failed to sync book to PDS: {error}");
+            // Don't fail the local operation
         }
     }
 }
@@ -358,13 +399,17 @@ pub async fn quick_add_submit(
         )
         .await
     {
-        Ok(book_id) => Redirect::to(&format!("/books/{}", book_id)).into_response(),
+        Ok(book_id) => {
+            // Sync book to PDS (don't fail if this errors)
+            sync_book_to_pds(&user, &metadata.title, metadata.author.as_deref(), None).await;
+            Redirect::to(&format!("/books/{}", book_id)).into_response()
+        }
         Err(error) => {
             eprintln!("Book creation error: {error}");
             let template = QuickAddTemplate {
                 is_authenticated: true,
                 signups_disabled: signups_disabled(),
-                username: user.username,
+                username: user.username.clone(),
                 error_message: Some("Could not save book. Please try again.".to_string()),
             };
             Html(template.render().unwrap()).into_response()

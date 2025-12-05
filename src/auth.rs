@@ -13,7 +13,7 @@ use crate::database::Database;
 use crate::templates::{ChangePasswordTemplate, LoginTemplate, ProfileTemplate, SignupTemplate};
 
 // User-related structures
-#[derive(sqlx::FromRow, Serialize)]
+#[derive(sqlx::FromRow, Serialize, Clone)]
 pub struct User {
     pub id: String,
     pub username: String,
@@ -22,6 +22,12 @@ pub struct User {
     pub created_at: String,
     /// atproto DID
     pub did: Option<String>,
+    /// atproto access JWT
+    #[serde(skip)]
+    pub access_jwt: Option<String>,
+    /// atproto refresh JWT
+    #[serde(skip)]
+    pub refresh_jwt: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -147,8 +153,8 @@ pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupFo
     }
 
     // Try to create account on PDS if configured
-    let pds_did = match create_pds_account(&username, &email, &password, &invite_code).await {
-        Ok(did) => did,
+    let pds_creds = match create_pds_account(&username, &email, &password, &invite_code).await {
+        Ok(creds) => creds,
         Err(error) => {
             eprintln!("PDS account creation error: {error}");
             return render_signup(
@@ -160,8 +166,18 @@ pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupFo
         }
     };
 
+    // Extract credentials for database storage
+    let (did, access_jwt, refresh_jwt) = match &pds_creds {
+        Some(creds) => (
+            Some(creds.did.as_str()),
+            Some(creds.access_jwt.as_str()),
+            Some(creds.refresh_jwt.as_str()),
+        ),
+        None => (None, None, None),
+    };
+
     match db
-        .create_user_with_did(&username, &password, pds_did.as_deref())
+        .create_user_with_atproto(&username, &password, did, access_jwt, refresh_jwt)
         .await
     {
         Ok(user_id) => match db.create_session(&user_id).await {
@@ -203,14 +219,21 @@ pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupFo
     }
 }
 
+/// AT Protocol credentials returned from account creation
+pub struct AtprotoCredentials {
+    pub did: String,
+    pub access_jwt: String,
+    pub refresh_jwt: String,
+}
+
 /// Create an account on the configured PDS.
-/// Returns the DID if successful, or None if PDS is not configured.
+/// Returns credentials if successful, or None if PDS is not configured.
 async fn create_pds_account(
     username: &str,
     email: &str,
     password: &str,
     invite_code: &str,
-) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Option<AtprotoCredentials>, Box<dyn std::error::Error + Send + Sync>> {
     let Some(pds_client) = PdsClient::from_env() else {
         // PDS not configured, skip AT Protocol account creation
         return Ok(None);
@@ -236,7 +259,11 @@ async fn create_pds_account(
         response.handle, response.did
     );
 
-    Ok(Some(response.did))
+    Ok(Some(AtprotoCredentials {
+        did: response.did,
+        access_jwt: response.access_jwt,
+        refresh_jwt: response.refresh_jwt,
+    }))
 }
 
 pub async fn logout(State(db): State<AppState>, headers: HeaderMap) -> Response {

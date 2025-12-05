@@ -122,7 +122,7 @@ impl Database {
     // User-related database methods
     pub async fn get_all_users(&self) -> Result<Vec<crate::auth::User>, sqlx::Error> {
         let rows = sqlx::query(
-            "SELECT id, username, password_hash, created_at, did FROM users ORDER BY created_at DESC",
+            "SELECT id, username, password_hash, created_at, did, access_jwt, refresh_jwt FROM users ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -135,6 +135,8 @@ impl Database {
                 password_hash: row.get("password_hash"),
                 created_at: row.get("created_at"),
                 did: row.get("did"),
+                access_jwt: row.get("access_jwt"),
+                refresh_jwt: row.get("refresh_jwt"),
             })
             .collect();
 
@@ -142,15 +144,18 @@ impl Database {
     }
 
     pub async fn create_user(&self, username: &str, password: &str) -> Result<String, DynError> {
-        self.create_user_with_did(username, password, None).await
+        self.create_user_with_atproto(username, password, None, None, None)
+            .await
     }
 
-    /// Create a new user with an optional AT Protocol DID.
-    pub async fn create_user_with_did(
+    /// Create a new user with optional AT Protocol credentials.
+    pub async fn create_user_with_atproto(
         &self,
         username: &str,
         password: &str,
         did: Option<&str>,
+        access_jwt: Option<&str>,
+        refresh_jwt: Option<&str>,
     ) -> Result<String, DynError> {
         // Check if username already exists
         let existing_user = sqlx::query("SELECT id FROM users WHERE username = ?")
@@ -171,7 +176,7 @@ impl Database {
 
         // Insert user into database
         sqlx::query(
-            "INSERT INTO users (id, username, password_hash, created_at, updated_at, did) VALUES (?, ?, ?, ?, ?, ?)"
+            "INSERT INTO users (id, username, password_hash, created_at, updated_at, did, access_jwt, refresh_jwt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         )
         .bind(&user_id)
         .bind(username)
@@ -179,6 +184,8 @@ impl Database {
         .bind(&now)
         .bind(&now)
         .bind(did)
+        .bind(access_jwt)
+        .bind(refresh_jwt)
         .execute(&self.pool)
         .await?;
 
@@ -191,7 +198,7 @@ impl Database {
         password: &str,
     ) -> Result<Option<crate::auth::User>, DynError> {
         let user_row = sqlx::query(
-            "SELECT id, username, password_hash, created_at, did FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, created_at, did, access_jwt, refresh_jwt FROM users WHERE username = ?",
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -207,6 +214,8 @@ impl Database {
                     password_hash: stored_hash,
                     created_at: row.get("created_at"),
                     did: row.get("did"),
+                    access_jwt: row.get("access_jwt"),
+                    refresh_jwt: row.get("refresh_jwt"),
                 };
                 Ok(Some(user))
             } else {
@@ -275,7 +284,7 @@ impl Database {
         token: &str,
     ) -> Result<Option<crate::auth::User>, DynError> {
         let session_row = sqlx::query(
-            "SELECT s.user_id, u.username, u.password_hash, u.created_at, u.did
+            "SELECT s.user_id, u.username, u.password_hash, u.created_at, u.did, u.access_jwt, u.refresh_jwt
              FROM sessions s
              JOIN users u ON s.user_id = u.id
              WHERE s.token = ?",
@@ -291,11 +300,35 @@ impl Database {
                 password_hash: row.get("password_hash"),
                 created_at: row.get("created_at"),
                 did: row.get("did"),
+                access_jwt: row.get("access_jwt"),
+                refresh_jwt: row.get("refresh_jwt"),
             };
             Ok(Some(user))
         } else {
             Ok(None)
         }
+    }
+
+    /// Update user's AT Protocol tokens
+    pub async fn update_user_tokens(
+        &self,
+        user_id: &str,
+        access_jwt: &str,
+        refresh_jwt: &str,
+    ) -> Result<(), DynError> {
+        let now = chrono::Utc::now().to_rfc3339();
+
+        sqlx::query(
+            "UPDATE users SET access_jwt = ?, refresh_jwt = ?, updated_at = ? WHERE id = ?",
+        )
+        .bind(access_jwt)
+        .bind(refresh_jwt)
+        .bind(&now)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 
     pub async fn delete_session(&self, token: &str) -> Result<(), DynError> {
