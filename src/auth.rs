@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 
 use crate::AppState;
+use crate::atproto::PdsClient;
 use crate::database::Database;
 use crate::templates::{ChangePasswordTemplate, LoginTemplate, ProfileTemplate, SignupTemplate};
 
@@ -19,6 +20,8 @@ pub struct User {
     #[serde(skip)] // Never serialize password hash
     pub password_hash: String,
     pub created_at: String,
+    /// atproto DID
+    pub did: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -30,8 +33,10 @@ pub struct LoginRequest {
 #[derive(Deserialize)]
 pub struct SignupForm {
     pub username: String,
+    pub email: String,
     pub password: String,
     pub confirm_password: String,
+    pub invite_code: String,
 }
 
 pub async fn login_page(State(db): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
@@ -91,7 +96,7 @@ pub async fn signup_page(State(db): State<AppState>, headers: HeaderMap) -> impl
         return signup_disabled_response();
     }
 
-    render_signup(String::new(), None)
+    render_signup(String::new(), String::new(), String::new(), None)
 }
 
 pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupForm>) -> Response {
@@ -100,25 +105,65 @@ pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupFo
     }
 
     let username = form.username.trim().to_string();
+    let email = form.email.trim().to_string();
     let password = form.password;
     let confirm_password = form.confirm_password;
+    let invite_code = form.invite_code.trim().to_string();
 
     if username.is_empty() {
-        return render_signup(String::new(), Some("Username cannot be empty".to_string()));
+        return render_signup(
+            String::new(),
+            String::new(),
+            String::new(),
+            Some("Username cannot be empty".to_string()),
+        );
+    }
+
+    if email.is_empty() {
+        return render_signup(
+            username.clone(),
+            String::new(),
+            invite_code.clone(),
+            Some("Email cannot be empty".to_string()),
+        );
     }
 
     if password.len() < 8 {
         return render_signup(
             username.clone(),
+            email.clone(),
+            invite_code.clone(),
             Some("Password must be at least 8 characters long".to_string()),
         );
     }
 
     if password != confirm_password {
-        return render_signup(username.clone(), Some("Passwords do not match".to_string()));
+        return render_signup(
+            username.clone(),
+            email.clone(),
+            invite_code.clone(),
+            Some("Passwords do not match".to_string()),
+        );
     }
 
-    match db.create_user(&username, &password).await {
+    // Try to create account on PDS if configured
+    let pds_did = match create_pds_account(&username, &email, &password, &invite_code).await {
+        Ok(did) => did,
+        Err(error) => {
+            eprintln!("PDS account creation error: {error}");
+            return render_signup(
+                username,
+                email,
+                invite_code,
+                Some(format!("Could not create AT Protocol account: {}", error)),
+            );
+        }
+    };
+
+    match db
+        .create_user_with_did(&username, &password, pds_did.as_deref())
+        .await
+    {
         Ok(user_id) => match db.create_session(&user_id).await {
             Ok(token) => {
                 let mut response = Redirect::to("/").into_response();
@@ -131,22 +176,67 @@ pub async fn signup_submit(State(db): State<AppState>, Form(form): Form<SignupFo
                 eprintln!("Session creation error: {error}");
                 render_signup(
                     username,
+                    email,
+                    invite_code,
                     Some("Could not create session. Please try again.".to_string()),
                 )
             }
         },
         Err(error) => {
             if error.to_string().contains("already exists") {
-                render_signup(username, Some("Username already exists".to_string()))
+                render_signup(
+                    username,
+                    email,
+                    invite_code,
+                    Some("Username already exists".to_string()),
+                )
             } else {
                 eprintln!("User registration error: {error}");
                 render_signup(
                     username,
+                    email,
+                    invite_code,
                     Some("Could not create account. Please try again.".to_string()),
                 )
             }
         }
     }
+}
+
+/// Create an account on the configured PDS.
+/// Returns the DID if successful, or None if PDS is not configured.
+async fn create_pds_account(
+    username: &str,
+    email: &str,
+    password: &str,
+    invite_code: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
+    let Some(pds_client) = PdsClient::from_env() else {
+        // PDS not configured, skip AT Protocol account creation
+        return Ok(None);
+    };
+
+    // Generate handle from username
+    let handle = pds_client.make_handle(username)?;
+
+    // Prepare invite code (empty string means no invite code)
+    let invite_code = if invite_code.is_empty() {
+        None
+    } else {
+        Some(invite_code)
+    };
+
+    // Create account on PDS
+    let response = pds_client
+        .create_account(&handle, Some(email), Some(password), invite_code)
+        .await?;
+
+    println!(
+        "Created AT Protocol account: {} (DID: {})",
+        response.handle, response.did
+    );
+
+    Ok(Some(response.did))
 }
 
 pub async fn logout(State(db): State<AppState>, headers: HeaderMap) -> Response {
@@ -166,16 +256,17 @@ pub async fn logout(State(db): State<AppState>, headers: HeaderMap) -> Response 
 pub async fn profile_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
     let user = current_user(&db, &headers).await;
 
-    if user.is_none() {
+    let Some(user) = user else {
         return Redirect::to("/login").into_response();
-    }
+    };
 
     let book_count = db.get_book_count().await.unwrap_or(0);
 
     let template = ProfileTemplate {
         is_authenticated: true,
         signups_disabled: signups_disabled(),
-        username: user.map(|u| u.username).unwrap_or_default(),
+        username: user.username,
+        did: user.did,
         book_count,
     };
 
@@ -266,12 +357,19 @@ fn render_login(form_username: String, error_message: Option<String>) -> Respons
     Html(template.render().unwrap()).into_response()
 }
 
-fn render_signup(form_username: String, error_message: Option<String>) -> Response {
+fn render_signup(
+    form_username: String,
+    form_email: String,
+    form_invite_code: String,
+    error_message: Option<String>,
+) -> Response {
     let template = SignupTemplate {
         is_authenticated: false,
         signups_disabled: signups_disabled(),
         username: String::new(),
         form_username,
+        form_email,
+        form_invite_code,
         error_message,
     };
 

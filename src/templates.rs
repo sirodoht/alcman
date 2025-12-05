@@ -30,6 +30,8 @@ pub struct SignupTemplate {
     pub signups_disabled: bool,
     pub username: String,
     pub form_username: String,
+    pub form_email: String,
+    pub form_invite_code: String,
     pub error_message: Option<String>,
 }
 
@@ -86,6 +88,7 @@ pub struct ProfileTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,
+    pub did: Option<String>,
     pub book_count: i64,
 }
 

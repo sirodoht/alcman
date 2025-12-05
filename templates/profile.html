@@ -11,6 +11,15 @@
         </div>
     </div>
 
+    {% if let Some(did) = did %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">DID</span>
+            <span class="page-value">{{ did }}</span>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">books</span>

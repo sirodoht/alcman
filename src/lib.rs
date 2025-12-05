@@ -4,6 +4,7 @@ use axum::{
 };
 use std::sync::Arc;
 
+pub mod atproto;
 pub mod auth;
 pub mod books;
 pub mod database;

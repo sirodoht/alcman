@@ -122,7 +122,7 @@ impl Database {
     // User-related database methods
     pub async fn get_all_users(&self) -> Result<Vec<crate::auth::User>, sqlx::Error> {
         let rows = sqlx::query(
-            "SELECT id, username, password_hash, created_at FROM users ORDER BY created_at DESC",
+            "SELECT id, username, password_hash, created_at, did FROM users ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -134,6 +134,7 @@ impl Database {
                 username: row.get("username"),
                 password_hash: row.get("password_hash"),
                 created_at: row.get("created_at"),
+                did: row.get("did"),
             })
             .collect();
 
@@ -141,6 +142,16 @@ impl Database {
     }
 
     pub async fn create_user(&self, username: &str, password: &str) -> Result<String, DynError> {
+        self.create_user_with_did(username, password, None).await
+    }
+
+    /// Create a new user with an optional AT Protocol DID.
+    pub async fn create_user_with_did(
+        &self,
+        username: &str,
+        password: &str,
+        did: Option<&str>,
+    ) -> Result<String, DynError> {
         // Check if username already exists
         let existing_user = sqlx::query("SELECT id FROM users WHERE username = ?")
             .bind(username)
@@ -160,13 +171,14 @@ impl Database {
 
         // Insert user into database
         sqlx::query(
-            "INSERT INTO users (id, username, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+            "INSERT INTO users (id, username, password_hash, created_at, updated_at, did) VALUES (?, ?, ?, ?, ?, ?)"
         )
         .bind(&user_id)
         .bind(username)
         .bind(&password_hash)
         .bind(&now)
         .bind(&now)
+        .bind(did)
         .execute(&self.pool)
         .await?;
 
@@ -179,7 +191,7 @@ impl Database {
         password: &str,
     ) -> Result<Option<crate::auth::User>, DynError> {
         let user_row = sqlx::query(
-            "SELECT id, username, password_hash, created_at FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, created_at, did FROM users WHERE username = ?",
         )
         .bind(username)
         .fetch_optional(&self.pool)
@@ -194,6 +206,7 @@ impl Database {
                     username: row.get("username"),
                     password_hash: stored_hash,
                     created_at: row.get("created_at"),
+                    did: row.get("did"),
                 };
                 Ok(Some(user))
             } else {
@@ -262,7 +275,7 @@ impl Database {
         token: &str,
     ) -> Result<Option<crate::auth::User>, DynError> {
         let session_row = sqlx::query(
-            "SELECT s.user_id, u.username, u.password_hash, u.created_at
+            "SELECT s.user_id, u.username, u.password_hash, u.created_at, u.did
              FROM sessions s
              JOIN users u ON s.user_id = u.id
              WHERE s.token = ?",
@@ -277,6 +290,7 @@ impl Database {
                 username: row.get("username"),
                 password_hash: row.get("password_hash"),
                 created_at: row.get("created_at"),
+                did: row.get("did"),
             };
             Ok(Some(user))
         } else {
