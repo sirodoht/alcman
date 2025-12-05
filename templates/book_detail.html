@@ -31,6 +31,24 @@
     </div>
     {% endif %}
 
+    {% if let Some(started) = book.started_date() %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">Started</span>
+            <span class="page-value">{{ started }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if let Some(finished) = book.finished_date() %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">Finished</span>
+            <span class="page-value">{{ finished }}</span>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">Amazon UK</span>

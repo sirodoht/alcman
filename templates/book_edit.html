@@ -48,6 +48,18 @@
             </div>
         </div>
         <div class="page-row">
+            <div class="page-content">
+                <label for="started_at">started</label>
+                <input type="date" id="started_at" name="started_at" value="{% if let Some(date) = book.started_date() %}{{ date }}{% endif %}">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content">
+                <label for="finished_at">finished</label>
+                <input type="date" id="finished_at" name="finished_at" value="{% if let Some(date) = book.finished_date() %}{{ date }}{% endif %}">
+            </div>
+        </div>
+        <div class="page-row">
             <div class="page-content page-actions">
                 <a href="/books/{{ book.id }}" class="btn">cancel</a>
                 <button type="submit">save</button>

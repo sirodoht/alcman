@@ -29,6 +29,8 @@ pub struct Book {
     pub filepath: Option<String>,
     pub notes: Option<String>,
     pub status: Option<String>,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
     pub created_at: String,
 }
 
@@ -39,6 +41,18 @@ impl Book {
             .next()
             .unwrap_or(&self.created_at)
     }
+
+    pub fn started_date(&self) -> Option<&str> {
+        self.started_at
+            .as_ref()
+            .map(|s| s.split('T').next().unwrap_or(s.as_str()))
+    }
+
+    pub fn finished_date(&self) -> Option<&str> {
+        self.finished_at
+            .as_ref()
+            .map(|s| s.split('T').next().unwrap_or(s.as_str()))
+    }
 }
 
 #[derive(Deserialize)]
@@ -47,6 +61,8 @@ pub struct CreateBookForm {
     pub author: String,
     pub publication_year: String,
     pub status: String,
+    pub started_at: String,
+    pub finished_at: String,
     pub notes: String,
 }
 
@@ -62,6 +78,8 @@ pub struct EditBookForm {
     pub author: String,
     pub publication_year: String,
     pub status: String,
+    pub started_at: String,
+    pub finished_at: String,
 }
 
 #[derive(Deserialize)]
@@ -175,8 +193,28 @@ pub async fn book_create(
         Some(form.notes.trim())
     };
 
+    let started_at = if form.started_at.trim().is_empty() {
+        None
+    } else {
+        Some(form.started_at.trim())
+    };
+
+    let finished_at = if form.finished_at.trim().is_empty() {
+        None
+    } else {
+        Some(form.finished_at.trim())
+    };
+
     match db
-        .create_book(title, author, publication_year, status, notes)
+        .create_book(
+            title,
+            author,
+            publication_year,
+            status,
+            started_at,
+            finished_at,
+            notes,
+        )
         .await
     {
         Ok(_) => {
@@ -427,7 +465,9 @@ pub async fn quick_add_submit(
             metadata.author.as_deref(),
             metadata.publication_year,
             Some("want-to-read"),
-            None,
+            None, // started_at
+            None, // finished_at
+            None, // notes
         )
         .await
     {
@@ -528,8 +568,28 @@ pub async fn book_edit_submit(
         Some(form.status.trim())
     };
 
+    let started_at = if form.started_at.trim().is_empty() {
+        None
+    } else {
+        Some(form.started_at.trim())
+    };
+
+    let finished_at = if form.finished_at.trim().is_empty() {
+        None
+    } else {
+        Some(form.finished_at.trim())
+    };
+
     match db
-        .update_book(&book_id, title, author, publication_year, status)
+        .update_book(
+            &book_id,
+            title,
+            author,
+            publication_year,
+            status,
+            started_at,
+            finished_at,
+        )
         .await
     {
         Ok(_) => {
@@ -776,13 +836,11 @@ pub async fn book_edit_chat_apply(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    // Get existing book to preserve status
-    let existing_status = db
-        .get_book_by_id(&book_id)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|b| b.status);
+    // Get existing book to preserve status and dates
+    let existing_book = db.get_book_by_id(&book_id).await.ok().flatten();
+    let existing_status = existing_book.as_ref().and_then(|b| b.status.clone());
+    let existing_started_at = existing_book.as_ref().and_then(|b| b.started_at.clone());
+    let existing_finished_at = existing_book.as_ref().and_then(|b| b.finished_at.clone());
 
     match db
         .update_book(
@@ -791,6 +849,8 @@ pub async fn book_edit_chat_apply(
             author,
             publication_year,
             existing_status.as_deref(),
+            existing_started_at.as_deref(),
+            existing_finished_at.as_deref(),
         )
         .await
     {

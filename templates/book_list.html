@@ -51,6 +51,12 @@
                     {% if let Some(status) = book.status %}
                     <span class="books-list-item-status">{{ status }}</span>
                     {% endif %}
+                    {% if let Some(started) = book.started_date() %}
+                    <span class="books-list-item-started">started {{ started }}</span>
+                    {% endif %}
+                    {% if let Some(finished) = book.finished_date() %}
+                    <span class="books-list-item-finished">finished {{ finished }}</span>
+                    {% endif %}
                     {% if let Some(year) = book.publication_year %}
                     <span class="books-list-item-year">{{ year }}</span>
                     {% endif %}
