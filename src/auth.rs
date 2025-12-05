@@ -319,8 +319,9 @@ pub async fn profile_by_did_page(
     };
 
     // Fetch book entries from PDS
-    let book_entries = match PdsClient::from_env() {
-        Some(pds_client) => match pds_client.list_book_entries(&did).await {
+    let pds_client = PdsClient::from_env();
+    let book_entries = match &pds_client {
+        Some(client) => match client.list_book_entries(&did).await {
             Ok(entries) => entries,
             Err(error) => {
                 eprintln!("Error fetching book entries from PDS: {error}");
@@ -328,6 +329,30 @@ pub async fn profile_by_did_page(
             }
         },
         None => vec![],
+    };
+
+    // Determine if current user can follow this profile
+    // (logged in, different user, both have DIDs)
+    let current_did = current.as_ref().and_then(|u| u.did.clone());
+    let can_follow = current.is_some()
+        && profile_user.did.is_some()
+        && current_did.as_deref() != profile_user.did.as_deref();
+
+    // Check if current user is already following this profile
+    let is_following = if can_follow {
+        if let (Some(follower_did), Some(client)) = (&current_did, &pds_client) {
+            match client.is_following(follower_did, &did).await {
+                Ok(following) => following,
+                Err(error) => {
+                    eprintln!("Error checking follow status: {error}");
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    } else {
+        false
     };
 
     // Current user's username for nav (empty if not logged in)
@@ -343,9 +368,90 @@ pub async fn profile_by_did_page(
         profile_username: profile_user.username,
         profile_did: profile_user.did,
         book_entries,
+        can_follow,
+        is_following,
     };
 
     Html(template.render().unwrap()).into_response()
+}
+
+/// Follow a user
+pub async fn follow_user(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Path(subject_did): Path<String>,
+) -> Response {
+    let current = current_user(&db, &headers).await;
+
+    let Some(current) = current else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let Some(follower_did) = &current.did else {
+        return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
+    };
+
+    let Some(access_jwt) = &current.access_jwt else {
+        return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
+    };
+
+    // Create follow record on PDS
+    if let Some(pds_client) = PdsClient::from_env() {
+        match pds_client
+            .create_follow(access_jwt, follower_did, &subject_did)
+            .await
+        {
+            Ok(response) => {
+                println!(
+                    "Created follow: {} -> {} (uri: {})",
+                    follower_did, subject_did, response.uri
+                );
+            }
+            Err(error) => {
+                eprintln!("Failed to create follow: {error}");
+            }
+        }
+    }
+
+    Redirect::to(&format!("/profile/{}", subject_did)).into_response()
+}
+
+/// Unfollow a user
+pub async fn unfollow_user(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Path(subject_did): Path<String>,
+) -> Response {
+    let current = current_user(&db, &headers).await;
+
+    let Some(current) = current else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let Some(follower_did) = &current.did else {
+        return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
+    };
+
+    let Some(access_jwt) = &current.access_jwt else {
+        return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
+    };
+
+    // Delete follow record on PDS
+    if let Some(pds_client) = PdsClient::from_env() {
+        match pds_client
+            .delete_follow(access_jwt, follower_did, &subject_did)
+            .await
+        {
+            Ok(()) => {
+                println!("Deleted follow: {} -> {}", follower_did, subject_did);
+            }
+            Err(error) => {
+                eprintln!("Failed to delete follow: {error}");
+            }
+        }
+    }
+
+    Redirect::to(&format!("/profile/{}", subject_did)).into_response()
 }
 
 pub async fn change_password_page(State(db): State<AppState>, headers: HeaderMap) -> Response {

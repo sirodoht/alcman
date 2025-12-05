@@ -145,6 +145,46 @@ impl BookEntryRecord {
     }
 }
 
+// ============================================================================
+// app.alcman.graph.follow Lexicon Types
+// ============================================================================
+
+/// A follow relationship record (app.alcman.graph.follow)
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FollowRecord {
+    /// Record type identifier
+    #[serde(rename = "$type")]
+    pub record_type: String,
+    /// DID of the user being followed
+    pub subject: String,
+    /// When the follow was created
+    pub created_at: String,
+}
+
+impl FollowRecord {
+    /// Create a new follow record
+    pub fn new(subject: String) -> Self {
+        Self {
+            record_type: "app.alcman.graph.follow".to_string(),
+            subject,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        }
+    }
+}
+
+/// Request to delete a record via com.atproto.repo.deleteRecord
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteRecordRequest {
+    /// The DID of the repo
+    pub repo: String,
+    /// The NSID of the record collection
+    pub collection: String,
+    /// The record key (rkey)
+    pub rkey: String,
+}
+
 pub type AtprotoResult<T> = Result<T, AtprotoError>;
 
 #[derive(Debug)]
@@ -386,5 +426,108 @@ impl PdsClient {
             .list_records(did, "app.alcman.book.entry", Some(100))
             .await?;
         Ok(response.records)
+    }
+
+    /// Delete a record from a user's repository.
+    ///
+    /// Calls com.atproto.repo.deleteRecord
+    pub async fn delete_record(
+        &self,
+        access_jwt: &str,
+        repo: &str,
+        collection: &str,
+        rkey: &str,
+    ) -> AtprotoResult<()> {
+        let url = format!("{}/xrpc/com.atproto.repo.deleteRecord", self.pds_url);
+
+        let request = DeleteRecordRequest {
+            repo: repo.to_string(),
+            collection: collection.to_string(),
+            rkey: rkey.to_string(),
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", access_jwt))
+            .json(&request)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// Create a follow record in a user's repository.
+    pub async fn create_follow(
+        &self,
+        access_jwt: &str,
+        follower_did: &str,
+        subject_did: &str,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        let record = FollowRecord::new(subject_did.to_string());
+        self.create_record(access_jwt, follower_did, "app.alcman.graph.follow", record)
+            .await
+    }
+
+    /// List follow records from a user's repository.
+    pub async fn list_follows(&self, did: &str) -> AtprotoResult<Vec<RecordEntry<FollowRecord>>> {
+        let response: ListRecordsResponse<FollowRecord> = self
+            .list_records(did, "app.alcman.graph.follow", Some(100))
+            .await?;
+        Ok(response.records)
+    }
+
+    /// Check if a user is following another user and return the record key if so.
+    pub async fn get_follow_rkey(
+        &self,
+        follower_did: &str,
+        subject_did: &str,
+    ) -> AtprotoResult<Option<String>> {
+        let follows = self.list_follows(follower_did).await?;
+        for follow in follows {
+            if follow.value.subject == subject_did {
+                // Extract rkey from URI: at://did/collection/rkey
+                if let Some(rkey) = follow.uri.split('/').last() {
+                    return Ok(Some(rkey.to_string()));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Check if a user is following another user.
+    pub async fn is_following(&self, follower_did: &str, subject_did: &str) -> AtprotoResult<bool> {
+        let rkey = self.get_follow_rkey(follower_did, subject_did).await?;
+        Ok(rkey.is_some())
+    }
+
+    /// Delete a follow record (unfollow).
+    pub async fn delete_follow(
+        &self,
+        access_jwt: &str,
+        follower_did: &str,
+        subject_did: &str,
+    ) -> AtprotoResult<()> {
+        // Find the rkey for this follow
+        let rkey = self.get_follow_rkey(follower_did, subject_did).await?;
+
+        if let Some(rkey) = rkey {
+            self.delete_record(access_jwt, follower_did, "app.alcman.graph.follow", &rkey)
+                .await
+        } else {
+            // Not following, nothing to delete
+            Ok(())
+        }
     }
 }

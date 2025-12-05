@@ -20,6 +20,22 @@
     </div>
     {% endif %}
 
+    {% if can_follow %}
+    <div class="page-row">
+        <div class="page-content page-actions">
+            {% if is_following %}
+            <form method="post" action="/profile/{{ profile_did.as_deref().unwrap_or_default() }}/unfollow">
+                <button type="submit" class="btn">unfollow</button>
+            </form>
+            {% else %}
+            <form method="post" action="/profile/{{ profile_did.as_deref().unwrap_or_default() }}/follow">
+                <button type="submit" class="btn">follow</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     {% if username == profile_username %}
     <div class="page-row">
         <div class="page-content page-actions">

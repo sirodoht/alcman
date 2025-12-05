@@ -95,6 +95,10 @@ pub struct ProfileTemplate {
     pub profile_did: Option<String>,
     /// Book entries from the PDS
     pub book_entries: Vec<crate::atproto::RecordEntry<crate::atproto::BookEntryRecord>>,
+    /// Whether the current user can follow this profile (logged in, different user, profile has DID)
+    pub can_follow: bool,
+    /// Whether the current user is already following this profile
+    pub is_following: bool,
 }
 
 #[derive(Template)]

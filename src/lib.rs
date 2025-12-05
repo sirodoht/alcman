@@ -21,8 +21,8 @@ pub type AppState = Arc<Database>;
 // App creation function
 pub fn create_app(db: AppState) -> Router {
     use auth::{
-        change_password, change_password_page, login_page, login_submit, logout,
-        profile_by_did_page, profile_redirect, signup_page, signup_submit,
+        change_password, change_password_page, follow_user, login_page, login_submit, logout,
+        profile_by_did_page, profile_redirect, signup_page, signup_submit, unfollow_user,
     };
     use books::{
         book_create, book_delete, book_detail, book_download, book_edit_chat_apply,
@@ -39,6 +39,8 @@ pub fn create_app(db: AppState) -> Router {
         .route("/logout", post(logout))
         .route("/profile", get(profile_redirect))
         .route("/profile/{did}", get(profile_by_did_page))
+        .route("/profile/{did}/follow", post(follow_user))
+        .route("/profile/{did}/unfollow", post(unfollow_user))
         .route(
             "/profile/password",
             get(change_password_page).post(change_password),
