@@ -87,8 +87,12 @@ pub struct BookEditNotesTemplate {
 pub struct ProfileTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
+    /// Current logged-in user's username (for nav)
     pub username: String,
-    pub did: Option<String>,
+    /// Profile owner's username
+    pub profile_username: String,
+    /// Profile owner's DID
+    pub profile_did: Option<String>,
     pub book_count: i64,
 }
 

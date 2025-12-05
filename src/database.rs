@@ -260,6 +260,26 @@ impl Database {
         Ok(())
     }
 
+    /// Get a user by their AT Protocol DID
+    pub async fn get_user_by_did(&self, did: &str) -> Result<Option<crate::auth::User>, DynError> {
+        let user_row = sqlx::query(
+            "SELECT id, username, password_hash, created_at, did, access_jwt, refresh_jwt FROM users WHERE did = ?",
+        )
+        .bind(did)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(user_row.map(|row| crate::auth::User {
+            id: row.get("id"),
+            username: row.get("username"),
+            password_hash: row.get("password_hash"),
+            created_at: row.get("created_at"),
+            did: row.get("did"),
+            access_jwt: row.get("access_jwt"),
+            refresh_jwt: row.get("refresh_jwt"),
+        }))
+    }
+
     // Session management methods
     pub async fn create_session(&self, user_id: &str) -> Result<String, DynError> {
         // Generate a simple session token (UUID)

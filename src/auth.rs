@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::{Form, State},
+    extract::{Form, Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{Html, IntoResponse, Redirect, Response},
 };
@@ -280,20 +280,58 @@ pub async fn logout(State(db): State<AppState>, headers: HeaderMap) -> Response 
     response
 }
 
-pub async fn profile_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+/// Redirect /profile to /profile/{did} for the current user
+pub async fn profile_redirect(State(db): State<AppState>, headers: HeaderMap) -> Response {
     let user = current_user(&db, &headers).await;
 
     let Some(user) = user else {
         return Redirect::to("/login").into_response();
     };
 
+    // Redirect to the user's profile by DID
+    match user.did {
+        Some(did) => Redirect::to(&format!("/profile/{}", did)).into_response(),
+        None => {
+            // User doesn't have a DID, show error or redirect home
+            Redirect::to("/").into_response()
+        }
+    }
+}
+
+/// Show profile page for a specific DID
+pub async fn profile_by_did_page(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Path(did): Path<String>,
+) -> Response {
+    let current = current_user(&db, &headers).await;
+
+    // Look up the user by DID
+    let profile_user = match db.get_user_by_did(&did).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            return (StatusCode::NOT_FOUND, "Profile not found").into_response();
+        }
+        Err(error) => {
+            eprintln!("Error fetching user by DID: {error}");
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+        }
+    };
+
     let book_count = db.get_book_count().await.unwrap_or(0);
 
+    // Current user's username for nav (empty if not logged in)
+    let current_username = current
+        .as_ref()
+        .map(|u| u.username.clone())
+        .unwrap_or_default();
+
     let template = ProfileTemplate {
-        is_authenticated: true,
+        is_authenticated: current.is_some(),
         signups_disabled: signups_disabled(),
-        username: user.username,
-        did: user.did,
+        username: current_username,
+        profile_username: profile_user.username,
+        profile_did: profile_user.did,
         book_count,
     };
 

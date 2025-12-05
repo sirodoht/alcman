@@ -1,17 +1,17 @@
 {% extends "layout.html" %}
 
-{% block title %}profile{% endblock title %}
+{% block title %}{{ profile_username }}{% endblock title %}
 
 {% block content %}
 <section>
     <div class="page-row">
         <div class="page-header">
-            <h1>{{ username }}</h1>
+            <h1>{{ profile_username }}</h1>
             <p>profile</p>
         </div>
     </div>
 
-    {% if let Some(did) = did %}
+    {% if let Some(did) = profile_did %}
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">DID</span>
@@ -27,6 +27,7 @@
         </div>
     </div>
 
+    {% if username == profile_username %}
     <div class="page-row">
         <div class="page-content page-actions">
             <a href="/profile/password" class="btn">change password</a>
@@ -35,5 +36,6 @@
             </form>
         </div>
     </div>
+    {% endif %}
 </section>
 {% endblock content %}
