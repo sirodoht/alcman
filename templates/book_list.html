@@ -48,6 +48,9 @@
                     {% endif %}
                 </div>
                 <div class="books-list-item-meta">
+                    {% if let Some(status) = book.status %}
+                    <span class="books-list-item-status">{{ status }}</span>
+                    {% endif %}
                     {% if let Some(year) = book.publication_year %}
                     <span class="books-list-item-year">{{ year }}</span>
                     {% endif %}

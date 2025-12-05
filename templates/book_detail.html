@@ -22,6 +22,15 @@
     </div>
     {% endif %}
 
+    {% if let Some(status) = book.status %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">Status</span>
+            <span class="page-value">{{ status }}</span>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">Amazon UK</span>

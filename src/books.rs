@@ -16,6 +16,9 @@ use crate::templates::{
     BookFormTemplate, BookListTemplate, QuickAddTemplate,
 };
 
+// Valid book status values
+pub const BOOK_STATUSES: [&str; 4] = ["reading", "finished", "want-to-read", "dropped"];
+
 // Book-related structures
 #[derive(sqlx::FromRow, Serialize, Clone)]
 pub struct Book {
@@ -25,6 +28,7 @@ pub struct Book {
     pub publication_year: Option<i32>,
     pub filepath: Option<String>,
     pub notes: Option<String>,
+    pub status: Option<String>,
     pub created_at: String,
 }
 
@@ -42,6 +46,7 @@ pub struct CreateBookForm {
     pub title: String,
     pub author: String,
     pub publication_year: String,
+    pub status: String,
     pub notes: String,
 }
 
@@ -56,6 +61,7 @@ pub struct EditBookForm {
     pub title: String,
     pub author: String,
     pub publication_year: String,
+    pub status: String,
 }
 
 #[derive(Deserialize)]
@@ -157,13 +163,22 @@ pub async fn book_create(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
+    let status = if form.status.trim().is_empty() || !BOOK_STATUSES.contains(&form.status.trim()) {
+        None
+    } else {
+        Some(form.status.trim())
+    };
+
     let notes = if form.notes.trim().is_empty() {
         None
     } else {
         Some(form.notes.trim())
     };
 
-    match db.create_book(title, author, publication_year, notes).await {
+    match db
+        .create_book(title, author, publication_year, status, notes)
+        .await
+    {
         Ok(_) => {
             // Sync book to PDS (don't fail if this errors)
             sync_book_to_pds(
@@ -171,6 +186,7 @@ pub async fn book_create(
                 title,
                 author,
                 publication_year,
+                status.map(String::from),
                 notes.map(String::from),
             )
             .await;
@@ -196,6 +212,7 @@ async fn sync_book_to_pds(
     title: &str,
     author: Option<&str>,
     publication_year: Option<i32>,
+    status: Option<String>,
     notes: Option<String>,
 ) {
     // Check if user has AT Protocol credentials
@@ -219,7 +236,7 @@ async fn sync_book_to_pds(
 
     // Create book entry on PDS
     match pds_client
-        .create_book_entry(access_jwt, did, book_ref, notes)
+        .create_book_entry(access_jwt, did, book_ref, status, notes)
         .await
     {
         Ok(response) => {
@@ -403,23 +420,25 @@ pub async fn quick_add_submit(
         }
     };
 
-    // Create the book with extracted metadata
+    // Create the book with extracted metadata (default status: want-to-read)
     match db
         .create_book(
             &metadata.title,
             metadata.author.as_deref(),
             metadata.publication_year,
+            Some("want-to-read"),
             None,
         )
         .await
     {
         Ok(book_id) => {
-            // Sync book to PDS (don't fail if this errors)
+            // Sync book to PDS (don't fail if this errors) - default to want-to-read for quick add
             sync_book_to_pds(
                 &user,
                 &metadata.title,
                 metadata.author.as_deref(),
                 metadata.publication_year,
+                Some("want-to-read".to_string()),
                 None,
             )
             .await;
@@ -503,18 +522,38 @@ pub async fn book_edit_submit(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
+    let status = if form.status.trim().is_empty() || !BOOK_STATUSES.contains(&form.status.trim()) {
+        None
+    } else {
+        Some(form.status.trim())
+    };
+
     match db
-        .update_book(&book_id, title, author, publication_year)
+        .update_book(&book_id, title, author, publication_year, status)
         .await
     {
-        Ok(_) => Redirect::to(&format!("/books/{}", book_id)).into_response(),
+        Ok(_) => {
+            // Sync updated book to PDS
+            if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
+                sync_book_to_pds(
+                    &user,
+                    &book.title,
+                    book.author.as_deref(),
+                    book.publication_year,
+                    book.status,
+                    book.notes,
+                )
+                .await;
+            }
+            Redirect::to(&format!("/books/{}", book_id)).into_response()
+        }
         Err(error) => {
             eprintln!("Book update error: {error}");
             if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
                 let template = BookEditTemplate {
                     is_authenticated: true,
                     signups_disabled: signups_disabled(),
-                    username: user.username,
+                    username: user.username.clone(),
                     book,
                     error_message: Some("Could not update book. Please try again.".to_string()),
                 };
@@ -582,6 +621,7 @@ pub async fn book_edit_notes_submit(
                     &book.title,
                     book.author.as_deref(),
                     book.publication_year,
+                    book.status,
                     book.notes,
                 )
                 .await;
@@ -736,8 +776,22 @@ pub async fn book_edit_chat_apply(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
+    // Get existing book to preserve status
+    let existing_status = db
+        .get_book_by_id(&book_id)
+        .await
+        .ok()
+        .flatten()
+        .and_then(|b| b.status);
+
     match db
-        .update_book(&book_id, title, author, publication_year)
+        .update_book(
+            &book_id,
+            title,
+            author,
+            publication_year,
+            existing_status.as_deref(),
+        )
         .await
     {
         Ok(_) => Redirect::to(&format!("/books/{}", book_id)).into_response(),

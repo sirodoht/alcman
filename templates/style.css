@@ -293,6 +293,14 @@ select:focus {
     font-size: 13px;
 }
 
+.books-list-item-status {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
 .books-list-item-year {
     background-color: #e9ecef;
     padding: 4px 8px;
