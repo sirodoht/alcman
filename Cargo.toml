@@ -7,6 +7,7 @@ edition = "2024"
 argon2 = { version = "0.5", features = ["std"] }
 askama = "0.14"
 axum = { version = "0.8", features = ["macros", "form"] }
+clap = { version = "4", features = ["derive"] }
 chrono = { version = "0.4", features = ["serde"] }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
