@@ -8,7 +8,7 @@ use axum::{
 use crate::AppState;
 use crate::atproto::{FeedItem, PdsClient};
 use crate::auth::{current_user, signups_disabled};
-use crate::templates::FeedTemplate;
+use crate::templates::{FeedTemplate, GlobalFeedTemplate};
 
 /// Show feed page with book entries from followed users
 pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
@@ -92,6 +92,70 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
         is_authenticated: true,
         signups_disabled: signups_disabled(),
         username: current.username,
+        feed_items,
+    };
+
+    Html(template.render().unwrap()).into_response()
+}
+
+/// Show a public global feed with book entries from all users.
+pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+    let current = current_user(&db, &headers).await;
+    let is_authenticated = current.is_some();
+    let username = current
+        .as_ref()
+        .map(|u| u.username.clone())
+        .unwrap_or_default();
+
+    let Some(pds_client) = PdsClient::from_env() else {
+        let template = GlobalFeedTemplate {
+            is_authenticated,
+            signups_disabled: signups_disabled(),
+            username,
+            feed_items: vec![],
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    let users = match db.get_all_users().await {
+        Ok(users) => users,
+        Err(error) => {
+            eprintln!("Error fetching users: {error}");
+            vec![]
+        }
+    };
+
+    let mut feed_items: Vec<FeedItem> = Vec::new();
+
+    for user in users {
+        let Some(did) = user.did.clone() else {
+            continue;
+        };
+
+        let entries = match pds_client.list_book_entries(&did).await {
+            Ok(entries) => entries,
+            Err(error) => {
+                eprintln!("Error fetching book entries for {did}: {error}");
+                continue;
+            }
+        };
+
+        for entry in entries {
+            feed_items.push(FeedItem {
+                entry: entry.value,
+                author_username: user.username.clone(),
+                author_did: did.clone(),
+            });
+        }
+    }
+
+    // Sort by created_at descending (most recent first)
+    feed_items.sort_by(|a, b| b.entry.created_at.cmp(&a.entry.created_at));
+
+    let template = GlobalFeedTemplate {
+        is_authenticated,
+        signups_disabled: signups_disabled(),
+        username,
         feed_items,
     };
 

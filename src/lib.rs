@@ -32,10 +32,10 @@ pub fn create_app(db: AppState) -> Router {
         book_edit_page, book_edit_submit, book_form_page, book_list, quick_add_page,
         quick_add_submit,
     };
-    use feed::feed_page;
+    use feed::{feed_page, global_feed_page};
 
     Router::new()
-        .route("/", get(book_list))
+        .route("/", get(global_feed_page))
         .route("/database", get(book_list))
         .route("/login", get(login_page).post(login_submit))
         .route("/signup", get(signup_page).post(signup_submit))

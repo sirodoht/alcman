@@ -131,3 +131,13 @@ pub struct FeedTemplate {
     /// Feed items (book entries with author info)
     pub feed_items: Vec<crate::atproto::FeedItem>,
 }
+
+#[derive(Template)]
+#[template(path = "global_feed.html")]
+pub struct GlobalFeedTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    /// Feed items (book entries with author info)
+    pub feed_items: Vec<crate::atproto::FeedItem>,
+}

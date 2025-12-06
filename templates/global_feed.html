@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block title %}global feed{% endblock title %}
+
+{% block content %}
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>global feed</h1>
+            <p>recent books the network</p>
+        </div>
+    </div>
+
+    {% if feed_items.is_empty() %}
+    <div class="page-row">
+        <div class="page-content">
+            <p><em>no posts yet. once users publish books they'll appear here.</em></p>
+        </div>
+    </div>
+    {% else %}
+    {% for item in feed_items %}
+    <div class="feed-entry">
+        <div class="feed-entry-content">
+            <div class="feed-entry-header">
+                <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
+                {% if let Some(authors) = item.entry.book.authors %}
+                <p class="feed-entry-author">{{ authors.join(", ") }}</p>
+                {% endif %}
+            </div>
+            {% if let Some(notes) = item.entry.notes %}
+            <div class="feed-entry-notes">
+                <p>{{ notes }}</p>
+            </div>
+            {% endif %}
+            <div class="feed-entry-footer">
+                {% if let Some(status) = item.entry.status %}
+                <span class="feed-entry-status">{{ status }}</span>
+                {% endif %}
+                <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+</section>
+{% endblock content %}
