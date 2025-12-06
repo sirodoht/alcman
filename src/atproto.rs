@@ -40,6 +40,26 @@ pub struct RefreshSessionResponse {
     pub did: String,
 }
 
+/// Request to create a session via com.atproto.server.createSession
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSessionRequest {
+    /// Handle or email of the account
+    pub identifier: String,
+    /// Password
+    pub password: String,
+}
+
+/// Response from com.atproto.server.createSession
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSessionResponse {
+    pub did: String,
+    pub handle: String,
+    pub access_jwt: String,
+    pub refresh_jwt: String,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct XrpcError {
     pub error: String,
@@ -173,6 +193,21 @@ impl FollowRecord {
     }
 }
 
+// ============================================================================
+// Feed Types
+// ============================================================================
+
+/// A feed item combining a book entry with author information
+#[derive(Debug)]
+pub struct FeedItem {
+    /// The book entry record
+    pub entry: BookEntryRecord,
+    /// Username of the author
+    pub author_username: String,
+    /// DID of the author
+    pub author_did: String,
+}
+
 /// Request to delete a record via com.atproto.repo.deleteRecord
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +256,13 @@ impl std::fmt::Display for AtprotoError {
 
 impl std::error::Error for AtprotoError {}
 
+impl AtprotoError {
+    /// Check if this error indicates an expired token
+    pub fn is_expired_token(&self) -> bool {
+        matches!(self, AtprotoError::Xrpc { error, .. } if error == "ExpiredToken")
+    }
+}
+
 impl From<reqwest::Error> for AtprotoError {
     fn from(e: reqwest::Error) -> Self {
         AtprotoError::Request(e)
@@ -264,6 +306,38 @@ impl PdsClient {
         if response.status().is_success() {
             let account: CreateAccountResponse = response.json().await?;
             Ok(account)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// Create a session (login) on the PDS.
+    ///
+    /// Calls com.atproto.server.createSession
+    pub async fn create_session(
+        &self,
+        identifier: &str,
+        password: &str,
+    ) -> AtprotoResult<CreateSessionResponse> {
+        let url = format!("{}/xrpc/com.atproto.server.createSession", self.pds_url);
+
+        let request = CreateSessionRequest {
+            identifier: identifier.to_string(),
+            password: password.to_string(),
+        };
+
+        let response = self.client.post(&url).json(&request).send().await?;
+
+        if response.status().is_success() {
+            let session: CreateSessionResponse = response.json().await?;
+            Ok(session)
         } else {
             let error: XrpcError = response.json().await.unwrap_or(XrpcError {
                 error: "UnknownError".to_string(),
@@ -368,6 +442,20 @@ impl PdsClient {
         }
     }
 
+    /// Create a record in a user's repository from raw JSON.
+    ///
+    /// Calls com.atproto.repo.createRecord
+    pub async fn create_record_raw(
+        &self,
+        access_jwt: &str,
+        repo: &str,
+        collection: &str,
+        record: serde_json::Value,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        self.create_record(access_jwt, repo, collection, record)
+            .await
+    }
+
     /// Create a book entry record in a user's repository.
     pub async fn create_book_entry(
         &self,
@@ -404,6 +492,41 @@ impl PdsClient {
 
         if response.status().is_success() {
             let result: ListRecordsResponse<T> = response.json().await?;
+            Ok(result)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// List records from a user's repository as raw JSON.
+    ///
+    /// Calls com.atproto.repo.listRecords (public, no auth required)
+    pub async fn list_records_raw(
+        &self,
+        repo: &str,
+        collection: &str,
+        limit: Option<u32>,
+    ) -> AtprotoResult<serde_json::Value> {
+        let mut url = format!(
+            "{}/xrpc/com.atproto.repo.listRecords?repo={}&collection={}",
+            self.pds_url, repo, collection
+        );
+
+        if let Some(limit) = limit {
+            url.push_str(&format!("&limit={}", limit));
+        }
+
+        let response = self.client.get(&url).send().await?;
+
+        if response.status().is_success() {
+            let result: serde_json::Value = response.json().await?;
             Ok(result)
         } else {
             let error: XrpcError = response.json().await.unwrap_or(XrpcError {

@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+
+{% block title %}feed{% endblock title %}
+
+{% block content %}
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>feed</h1>
+            <p>recent books from people you follow</p>
+        </div>
+    </div>
+
+    {% if feed_items.is_empty() %}
+    <div class="page-row">
+        <div class="page-content">
+            <p><em>no updates yet. follow some people to see their books here!</em></p>
+        </div>
+    </div>
+    {% else %}
+    {% for item in feed_items %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} ({{ year }}){% endif %}</span>
+            {% if let Some(authors) = item.entry.book.authors %}
+            <span class="page-value">{{ authors.join(", ") }}</span>
+            {% endif %}
+            <p style="margin-top: 0.5em; font-size: 0.9em;">
+                {% if let Some(status) = item.entry.status %}
+                <span style="color: #666;">{{ status }}</span> &middot;
+                {% endif %}
+                added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a>
+            </p>
+            {% if let Some(notes) = item.entry.notes %}
+            <p style="margin-top: 0.5em; color: #666; font-size: 0.9em;">{{ notes }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</section>
+{% endblock content %}

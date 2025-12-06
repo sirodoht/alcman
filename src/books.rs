@@ -10,7 +10,9 @@ use std::env;
 use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
 use crate::auth::{User, current_user, signups_disabled};
+use crate::database::Database;
 use crate::gpt::{GptClient, GptConfig};
+use crate::pds::AuthenticatedPds;
 use crate::templates::{
     BookDetailTemplate, BookEditChatTemplate, BookEditNotesTemplate, BookEditTemplate,
     BookFormTemplate, BookListTemplate, QuickAddTemplate,
@@ -220,6 +222,7 @@ pub async fn book_create(
         Ok(_) => {
             // Sync book to PDS (don't fail if this errors)
             sync_book_to_pds(
+                &db,
                 &user,
                 title,
                 author,
@@ -246,6 +249,7 @@ pub async fn book_create(
 /// Sync a book entry to the user's AT Protocol PDS.
 /// Logs errors but does not propagate them.
 async fn sync_book_to_pds(
+    db: &Database,
     user: &User,
     title: &str,
     author: Option<&str>,
@@ -253,14 +257,13 @@ async fn sync_book_to_pds(
     status: Option<String>,
     notes: Option<String>,
 ) {
-    // Check if user has AT Protocol credentials
-    let (Some(did), Some(access_jwt)) = (&user.did, &user.access_jwt) else {
-        // User doesn't have AT Protocol credentials, skip sync
+    let Some(pds_client) = PdsClient::from_env() else {
+        // PDS not configured
         return;
     };
 
-    let Some(pds_client) = PdsClient::from_env() else {
-        // PDS not configured
+    let Some(mut auth_pds) = AuthenticatedPds::new(&pds_client, db, user) else {
+        // User doesn't have AT Protocol credentials, skip sync
         return;
     };
 
@@ -273,10 +276,7 @@ async fn sync_book_to_pds(
     };
 
     // Create book entry on PDS
-    match pds_client
-        .create_book_entry(access_jwt, did, book_ref, status, notes)
-        .await
-    {
+    match auth_pds.create_book_entry(book_ref, status, notes).await {
         Ok(response) => {
             println!("Synced book to PDS: {} (uri: {})", title, response.uri);
         }
@@ -474,6 +474,7 @@ pub async fn quick_add_submit(
         Ok(book_id) => {
             // Sync book to PDS (don't fail if this errors) - default to want-to-read for quick add
             sync_book_to_pds(
+                &db,
                 &user,
                 &metadata.title,
                 metadata.author.as_deref(),
@@ -596,6 +597,7 @@ pub async fn book_edit_submit(
             // Sync updated book to PDS
             if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
                 sync_book_to_pds(
+                    &db,
                     &user,
                     &book.title,
                     book.author.as_deref(),
@@ -677,6 +679,7 @@ pub async fn book_edit_notes_submit(
             // Fetch the book to get full details for PDS sync
             if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
                 sync_book_to_pds(
+                    &db,
                     &user,
                     &book.title,
                     book.author.as_deref(),

@@ -8,7 +8,9 @@ pub mod atproto;
 pub mod auth;
 pub mod books;
 pub mod database;
+pub mod feed;
 pub mod gpt;
+pub mod pds;
 pub mod templates;
 
 pub use auth::User;
@@ -30,6 +32,7 @@ pub fn create_app(db: AppState) -> Router {
         book_edit_page, book_edit_submit, book_form_page, book_list, quick_add_page,
         quick_add_submit,
     };
+    use feed::feed_page;
 
     Router::new()
         .route("/", get(book_list))
@@ -37,6 +40,7 @@ pub fn create_app(db: AppState) -> Router {
         .route("/login", get(login_page).post(login_submit))
         .route("/signup", get(signup_page).post(signup_submit))
         .route("/logout", post(logout))
+        .route("/feed", get(feed_page))
         .route("/profile", get(profile_redirect))
         .route("/profile/{did}", get(profile_by_did_page))
         .route("/profile/{did}/follow", post(follow_user))

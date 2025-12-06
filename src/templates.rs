@@ -121,3 +121,13 @@ pub struct BookEditChatTemplate {
     pub error_message: Option<String>,
     pub edit_result: Option<BookEditResult>,
 }
+
+#[derive(Template)]
+#[template(path = "feed.html")]
+pub struct FeedTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    /// Feed items (book entries with author info)
+    pub feed_items: Vec<crate::atproto::FeedItem>,
+}

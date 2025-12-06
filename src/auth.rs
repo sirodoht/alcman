@@ -10,6 +10,7 @@ use std::env;
 use crate::AppState;
 use crate::atproto::PdsClient;
 use crate::database::Database;
+use crate::pds::AuthenticatedPds;
 use crate::templates::{ChangePasswordTemplate, LoginTemplate, ProfileTemplate, SignupTemplate};
 
 // User-related structures
@@ -228,7 +229,7 @@ pub struct AtprotoCredentials {
 
 /// Create an account on the configured PDS.
 /// Returns credentials if successful, or None if PDS is not configured.
-async fn create_pds_account(
+pub async fn create_pds_account(
     username: &str,
     email: &str,
     password: &str,
@@ -387,29 +388,25 @@ pub async fn follow_user(
         return Redirect::to("/login").into_response();
     };
 
-    let Some(follower_did) = &current.did else {
+    let Some(pds_client) = PdsClient::from_env() else {
         return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
     };
 
-    let Some(access_jwt) = &current.access_jwt else {
+    let Some(mut auth_pds) = AuthenticatedPds::new(&pds_client, &db, &current) else {
         return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
     };
 
-    // Create follow record on PDS
-    if let Some(pds_client) = PdsClient::from_env() {
-        match pds_client
-            .create_follow(access_jwt, follower_did, &subject_did)
-            .await
-        {
-            Ok(response) => {
-                println!(
-                    "Created follow: {} -> {} (uri: {})",
-                    follower_did, subject_did, response.uri
-                );
-            }
-            Err(error) => {
-                eprintln!("Failed to create follow: {error}");
-            }
+    match auth_pds.create_follow(&subject_did).await {
+        Ok(response) => {
+            println!(
+                "Created follow: {} -> {} (uri: {})",
+                auth_pds.did(),
+                subject_did,
+                response.uri
+            );
+        }
+        Err(error) => {
+            eprintln!("Failed to create follow: {error}");
         }
     }
 
@@ -428,26 +425,20 @@ pub async fn unfollow_user(
         return Redirect::to("/login").into_response();
     };
 
-    let Some(follower_did) = &current.did else {
+    let Some(pds_client) = PdsClient::from_env() else {
         return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
     };
 
-    let Some(access_jwt) = &current.access_jwt else {
+    let Some(mut auth_pds) = AuthenticatedPds::new(&pds_client, &db, &current) else {
         return Redirect::to(&format!("/profile/{}", subject_did)).into_response();
     };
 
-    // Delete follow record on PDS
-    if let Some(pds_client) = PdsClient::from_env() {
-        match pds_client
-            .delete_follow(access_jwt, follower_did, &subject_did)
-            .await
-        {
-            Ok(()) => {
-                println!("Deleted follow: {} -> {}", follower_did, subject_did);
-            }
-            Err(error) => {
-                eprintln!("Failed to delete follow: {error}");
-            }
+    match auth_pds.delete_follow(&subject_did).await {
+        Ok(()) => {
+            println!("Deleted follow: {} -> {}", auth_pds.did(), subject_did);
+        }
+        Err(error) => {
+            eprintln!("Failed to delete follow: {error}");
         }
     }
 
