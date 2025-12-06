@@ -10,6 +10,27 @@ pub struct Database {
 
 type DynError = Box<dyn std::error::Error + Send + Sync>;
 
+/// Input payload for creating a book.
+pub struct NewBook<'a> {
+    pub title: &'a str,
+    pub author: Option<&'a str>,
+    pub publication_year: Option<i32>,
+    pub status: Option<&'a str>,
+    pub started_at: Option<&'a str>,
+    pub finished_at: Option<&'a str>,
+    pub notes: Option<&'a str>,
+}
+
+/// Input payload for updating a book.
+pub struct BookUpdate<'a> {
+    pub title: &'a str,
+    pub author: Option<&'a str>,
+    pub publication_year: Option<i32>,
+    pub status: Option<&'a str>,
+    pub started_at: Option<&'a str>,
+    pub finished_at: Option<&'a str>,
+}
+
 impl Database {
     pub async fn new(database_url: &str) -> Result<Self, sqlx::Error> {
         // Create database if it doesn't exist
@@ -361,16 +382,16 @@ impl Database {
     }
 
     // Book-related database methods
-    pub async fn create_book(
-        &self,
-        title: &str,
-        author: Option<&str>,
-        publication_year: Option<i32>,
-        status: Option<&str>,
-        started_at: Option<&str>,
-        finished_at: Option<&str>,
-        notes: Option<&str>,
-    ) -> Result<String, DynError> {
+    pub async fn create_book(&self, new_book: NewBook<'_>) -> Result<String, DynError> {
+        let NewBook {
+            title,
+            author,
+            publication_year,
+            status,
+            started_at,
+            finished_at,
+            notes,
+        } = new_book;
         let book_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
 
@@ -515,13 +536,16 @@ impl Database {
     pub async fn update_book(
         &self,
         book_id: &str,
-        title: &str,
-        author: Option<&str>,
-        publication_year: Option<i32>,
-        status: Option<&str>,
-        started_at: Option<&str>,
-        finished_at: Option<&str>,
+        update: BookUpdate<'_>,
     ) -> Result<(), sqlx::Error> {
+        let BookUpdate {
+            title,
+            author,
+            publication_year,
+            status,
+            started_at,
+            finished_at,
+        } = update;
         let now = chrono::Utc::now().to_rfc3339();
         sqlx::query(
             "UPDATE books SET title = ?, author = ?, publication_year = ?, status = ?, started_at = ?, finished_at = ?, updated_at = ? WHERE id = ?",

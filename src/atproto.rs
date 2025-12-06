@@ -621,7 +621,7 @@ impl PdsClient {
         for follow in follows {
             if follow.value.subject == subject_did {
                 // Extract rkey from URI: at://did/collection/rkey
-                if let Some(rkey) = follow.uri.split('/').last() {
+                if let Some(rkey) = follow.uri.split('/').next_back() {
                     return Ok(Some(rkey.to_string()));
                 }
             }

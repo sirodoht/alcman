@@ -10,7 +10,7 @@ use std::env;
 use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
 use crate::auth::{User, current_user, signups_disabled};
-use crate::database::Database;
+use crate::database::{BookUpdate, Database, NewBook};
 use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
@@ -207,18 +207,17 @@ pub async fn book_create(
         Some(form.finished_at.trim())
     };
 
-    match db
-        .create_book(
-            title,
-            author,
-            publication_year,
-            status,
-            started_at,
-            finished_at,
-            notes,
-        )
-        .await
-    {
+    let new_book = NewBook {
+        title,
+        author,
+        publication_year,
+        status,
+        started_at,
+        finished_at,
+        notes,
+    };
+
+    match db.create_book(new_book).await {
         Ok(_) => {
             // Sync book to PDS (don't fail if this errors)
             sync_book_to_pds(
@@ -459,18 +458,17 @@ pub async fn quick_add_submit(
     };
 
     // Create the book with extracted metadata (default status: want-to-read)
-    match db
-        .create_book(
-            &metadata.title,
-            metadata.author.as_deref(),
-            metadata.publication_year,
-            Some("want-to-read"),
-            None, // started_at
-            None, // finished_at
-            None, // notes
-        )
-        .await
-    {
+    let new_book = NewBook {
+        title: &metadata.title,
+        author: metadata.author.as_deref(),
+        publication_year: metadata.publication_year,
+        status: Some("want-to-read"),
+        started_at: None,  // started_at
+        finished_at: None, // finished_at
+        notes: None,       // notes
+    };
+
+    match db.create_book(new_book).await {
         Ok(book_id) => {
             // Sync book to PDS (don't fail if this errors) - default to want-to-read for quick add
             sync_book_to_pds(
@@ -581,18 +579,16 @@ pub async fn book_edit_submit(
         Some(form.finished_at.trim())
     };
 
-    match db
-        .update_book(
-            &book_id,
-            title,
-            author,
-            publication_year,
-            status,
-            started_at,
-            finished_at,
-        )
-        .await
-    {
+    let update = BookUpdate {
+        title,
+        author,
+        publication_year,
+        status,
+        started_at,
+        finished_at,
+    };
+
+    match db.update_book(&book_id, update).await {
         Ok(_) => {
             // Sync updated book to PDS
             if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
@@ -845,18 +841,16 @@ pub async fn book_edit_chat_apply(
     let existing_started_at = existing_book.as_ref().and_then(|b| b.started_at.clone());
     let existing_finished_at = existing_book.as_ref().and_then(|b| b.finished_at.clone());
 
-    match db
-        .update_book(
-            &book_id,
-            title,
-            author,
-            publication_year,
-            existing_status.as_deref(),
-            existing_started_at.as_deref(),
-            existing_finished_at.as_deref(),
-        )
-        .await
-    {
+    let update = BookUpdate {
+        title,
+        author,
+        publication_year,
+        status: existing_status.as_deref(),
+        started_at: existing_started_at.as_deref(),
+        finished_at: existing_finished_at.as_deref(),
+    };
+
+    match db.update_book(&book_id, update).await {
         Ok(_) => Redirect::to(&format!("/books/{}", book_id)).into_response(),
         Err(error) => {
             eprintln!("Book update error: {error}");

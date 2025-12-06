@@ -70,13 +70,14 @@ impl<'a> AuthenticatedPds<'a> {
             .create_follow(&self.access_jwt, &self.did, subject_did)
             .await;
 
-        if let Err(ref error) = result {
-            if error.is_expired_token() && self.refresh_token().await {
-                return self
-                    .client
-                    .create_follow(&self.access_jwt, &self.did, subject_did)
-                    .await;
-            }
+        if let Err(ref error) = result
+            && error.is_expired_token()
+            && self.refresh_token().await
+        {
+            return self
+                .client
+                .create_follow(&self.access_jwt, &self.did, subject_did)
+                .await;
         }
 
         result
@@ -89,13 +90,14 @@ impl<'a> AuthenticatedPds<'a> {
             .delete_follow(&self.access_jwt, &self.did, subject_did)
             .await;
 
-        if let Err(ref error) = result {
-            if error.is_expired_token() && self.refresh_token().await {
-                return self
-                    .client
-                    .delete_follow(&self.access_jwt, &self.did, subject_did)
-                    .await;
-            }
+        if let Err(ref error) = result
+            && error.is_expired_token()
+            && self.refresh_token().await
+        {
+            return self
+                .client
+                .delete_follow(&self.access_jwt, &self.did, subject_did)
+                .await;
         }
 
         result
@@ -119,13 +121,14 @@ impl<'a> AuthenticatedPds<'a> {
             )
             .await;
 
-        if let Err(ref error) = result {
-            if error.is_expired_token() && self.refresh_token().await {
-                return self
-                    .client
-                    .create_book_entry(&self.access_jwt, &self.did, book, status, notes)
-                    .await;
-            }
+        if let Err(ref error) = result
+            && error.is_expired_token()
+            && self.refresh_token().await
+        {
+            return self
+                .client
+                .create_book_entry(&self.access_jwt, &self.did, book, status, notes)
+                .await;
         }
 
         result
