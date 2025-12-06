@@ -8,9 +8,10 @@ Type=simple
 User=deploy
 Group=www-data
 WorkingDirectory=/var/www/alcman
-ExecStart=/var/www/alcman/target/release/alcmanserver --serve --port 4002 --database /var/www/alcman/alcman.db
+ExecStart=/var/www/alcman/target/release/alcmanserver --serve --port 4000 --database /var/www/alcman/alcman.db
 Environment="DISABLE_SIGNUPS=0"
 Environment="OPENAI_API_KEY=sk-xxx"
+Environment="PDS_URL=https://alcman.social"
 Restart=always
 RestartSec=5
 
