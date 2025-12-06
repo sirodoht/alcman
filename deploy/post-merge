@@ -21,9 +21,9 @@ fi
 if cargo build --release; then
     echo "Post-merge hook: Build completed successfully!"
 
-    # Restart the alaya service
-    echo "Post-merge hook: Restarting alaya service..."
-    if sudo systemctl restart alaya; then
+    # Restart the alcman service
+    echo "Post-merge hook: Restarting alcman service..."
+    if sudo systemctl restart alcman; then
         echo "Post-merge hook: Service restarted successfully!"
     else
         echo "Post-merge hook: Failed to restart service!"

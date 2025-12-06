@@ -1,18 +1,18 @@
-use alaya::Database;
-use alaya::atproto::PdsClient;
-use alaya::auth::{AtprotoCredentials, create_pds_account};
+use alcman::Database;
+use alcman::atproto::PdsClient;
+use alcman::auth::{AtprotoCredentials, create_pds_account};
 use clap::{Parser, Subcommand};
 use std::env;
 
 #[derive(Parser)]
-#[command(name = "alayadmin")]
-#[command(about = "Admin CLI for Alaya", long_about = None)]
+#[command(name = "alcmandmin")]
+#[command(about = "Admin CLI for alcman", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
-    /// Database file path (default: ./alaya.db)
-    #[arg(long, default_value = "./alaya.db")]
+    /// Database file path (default: ./alcman.db)
+    #[arg(long, default_value = "./alcman.db")]
     database: String,
 }
 

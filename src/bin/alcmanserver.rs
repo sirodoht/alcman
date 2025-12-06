@@ -1,4 +1,4 @@
-use alaya::{Database, create_app};
+use alcman::{Database, create_app};
 use std::{env, sync::Arc};
 
 #[tokio::main]
@@ -8,23 +8,23 @@ async fn main() {
 
     // Default values
     let mut port = 3000;
-    let mut database_path = "./alaya.db".to_string();
+    let mut database_path = "./alcman.db".to_string();
     let mut serve = false;
 
     if args.len() == 1 {
-        println!("alaya book abode");
+        println!("alcman book abode");
         println!();
         println!("Usage:");
         println!("  {} --serve [OPTIONS]", args[0]);
         println!();
         println!("Options:");
-        println!("  --serve                    Start the alaya server");
+        println!("  --serve                   Start the alcman server");
         println!("  --port <PORT>             Port to bind to (default: 3000)");
-        println!("  --database <PATH>         Database file path (default: ./alaya.db)");
+        println!("  --database <PATH>         Database file path (default: ./alcman.db)");
         println!();
         println!("Example:");
         println!(
-            "  {} --serve --port 4000 --database /var/www/alaya/alaya.db",
+            "  {} --serve --port 4000 --database /var/www/alcman/alcman.db",
             args[0]
         );
         println!();
@@ -105,7 +105,7 @@ async fn main() {
         .await
         .expect("Failed to bind to address");
 
-    println!("alaya running on http://{}", bind_address);
+    println!("alcman running on http://{}", bind_address);
 
     axum::serve(listener, app)
         .await

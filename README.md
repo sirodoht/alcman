@@ -9,13 +9,13 @@ personal book notes
 cargo build
 
 # Compile and serve on default port :3000
-cargo run --bin alayaserver -- --serve
+cargo run --bin alcmanserver -- --serve
 
 # Serve with auto-reload
-cargo watch -x 'run --bin alayaserver -- --serve'
+cargo watch -x 'run --bin alcmanserver -- --serve'
 
 # Production mode
-cargo run --release --bin alayaserver -- --serve
+cargo run --release --bin alcmanserver -- --serve
 ```
 
 The server will start at `http://127.0.0.1:3000`
@@ -31,7 +31,7 @@ export OPENAI_API_KEY=sk-...
 Run the scanner to request a one-sentence summary for any book title:
 
 ```sh
-cargo run --bin alayascan "Invisible Cities"
+cargo run --bin alcmanscan "Invisible Cities"
 ```
 
 ### Disable public signups

@@ -4,7 +4,7 @@ use std::{env, error::Error, fmt};
 
 const OPENAI_CHAT_COMPLETIONS_URL: &str = "https://api.openai.com/v1/chat/completions";
 const DEFAULT_MODEL: &str = "gpt-5-nano";
-const USER_AGENT: &str = "alayascan/0.1.0";
+const USER_AGENT: &str = "alcmanscan/0.1.0";
 
 #[derive(Clone, Debug, Default)]
 pub struct GptConfig {

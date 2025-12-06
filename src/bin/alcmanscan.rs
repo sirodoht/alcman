@@ -1,5 +1,5 @@
-use alaya::Database;
-use alaya::gpt::{GptClient, GptConfig, GptError};
+use alcman::Database;
+use alcman::gpt::{GptClient, GptConfig, GptError};
 use epub::doc::EpubDoc;
 use lopdf::Document;
 use std::path::Path;
@@ -41,7 +41,7 @@ async fn main() {
     let config = GptConfig::from_env();
     if config.api_key().is_none() {
         eprintln!(
-            "OPENAI_API_KEY is not configured. Please export it before running the alayascan command."
+            "OPENAI_API_KEY is not configured. Please export it before running the alcmanscan command."
         );
         process::exit(1);
     }
@@ -55,11 +55,13 @@ async fn main() {
 
 fn print_usage() {
     eprintln!("Usage:");
-    eprintln!("  alayascan \"Book Title\"              - Summarize a book by title");
-    eprintln!("  alayascan --scan-dir <directory>    - Scan directory for book files");
-    eprintln!("  alayascan -d <directory>            - Scan directory for book files (short form)");
-    eprintln!("  alayascan --scan-dir <dir> --save   - Scan and save books to database");
-    eprintln!("  alayascan -d <dir> -s               - Scan and save (short form)");
+    eprintln!("  alcmanscan \"Book Title\"              - Summarize a book by title");
+    eprintln!("  alcmanscan --scan-dir <directory>    - Scan directory for book files");
+    eprintln!(
+        "  alcmanscan -d <directory>            - Scan directory for book files (short form)"
+    );
+    eprintln!("  alcmanscan --scan-dir <dir> --save   - Scan and save books to database");
+    eprintln!("  alcmanscan -d <dir> -s               - Scan and save (short form)");
     eprintln!();
     eprintln!("Supported file types: epub, mobi, pdf, docx, txt");
 }
@@ -81,7 +83,7 @@ async fn scan_directory(
     // Initialize database if saving
     let db = if save_to_db {
         let database_url =
-            env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:alaya.db".to_string());
+            env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:alcman.db".to_string());
         let db = Database::new(&database_url).await?;
         db.run_migrations().await?;
         Some(db)

@@ -1,5 +1,5 @@
 [Unit]
-Description=alaya
+Description=alcman
 After=network.target
 Wants=network.target
 
@@ -7,8 +7,8 @@ Wants=network.target
 Type=simple
 User=deploy
 Group=www-data
-WorkingDirectory=/var/www/alaya
-ExecStart=/var/www/alaya/target/release/alayaserver --serve --port 4002 --database /var/www/alaya/alaya.db
+WorkingDirectory=/var/www/alcman
+ExecStart=/var/www/alcman/target/release/alcmanserver --serve --port 4002 --database /var/www/alcman/alcman.db
 Environment="DISABLE_SIGNUPS=0"
 Environment="OPENAI_API_KEY=sk-xxx"
 Restart=always
