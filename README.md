@@ -1,6 +1,6 @@
-# ālaya
+# alcman
 
-personal book notes
+atproto-based book social network
 
 ## Setup
 
@@ -18,29 +18,7 @@ cargo watch -x 'run --bin alcmanserver -- --serve'
 cargo run --release --bin alcmanserver -- --serve
 ```
 
-The server will start at `http://127.0.0.1:3000`
-
-## Scan CLI tool
-
-Optionally configure the OpenAI integration by setting your API key:
-
-```sh
-export OPENAI_API_KEY=sk-...
-```
-
-Run the scanner to request a one-sentence summary for any book title:
-
-```sh
-cargo run --bin alcmanscan "Invisible Cities"
-```
-
-### Disable public signups
-
-Set the environment variable below to block new account creation in the web UI:
-
-```sh
-export DISABLE_SIGNUPS=1
-```
+The server will start at `http://localhost:3000`
 
 ## License
 
