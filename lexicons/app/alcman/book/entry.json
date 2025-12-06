@@ -1,0 +1,78 @@
+{
+    "lexicon": 1,
+    "id": "app.alcman.book.entry",
+    "revision": 1,
+    "description": "User-specific book entry with status and notes",
+    "defs": {
+      "main": {
+        "type": "record",
+        "key": "tid",
+        "description": "A user’s entry for a specific book",
+        "record": {
+          "type": "object",
+          "required": ["book", "createdAt"],
+          "properties": {
+            "book": {
+              "type": "ref",
+              "ref": "#bookRef",
+              "description": "Metadata about the book"
+            },
+            "notes": {
+              "type": "string",
+              "maxLength": 10000,
+              "description": "User’s notes about the book"
+            },
+            "status": {
+              "type": "string",
+              "knownValues": [
+                "reading",
+                "finished",
+                "wantToRead",
+                "dropped"
+              ],
+              "description": "User’s reading status"
+            },
+            "startedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the user started reading the book"
+            },
+            "finishedAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When the user finished reading the book"
+            },
+            "createdAt": {
+              "type": "string",
+              "format": "datetime",
+              "description": "When this entry was created"
+            }
+          }
+        }
+      },
+      "bookRef": {
+        "type": "object",
+        "description": "Book metadata",
+        "required": ["title"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Book title"
+          },
+          "authors": {
+            "type": "array",
+            "items": { "type": "string" },
+            "maxLength": 20,
+            "description": "List of author names"
+          },
+          "isbn": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "ISBN-10 or ISBN-13 without strict validation"
+          }
+        }
+      }
+    }
+  }
+  
