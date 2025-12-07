@@ -1,4 +1,4 @@
 export DISABLE_SIGNUPS=0
 export OPENAI_API_KEY=sk-xxx
-export LIBRARY_PATH=
+export CLAUDE_API_KEY=sk-xxx
 export PDS_URL=https://alcman.social

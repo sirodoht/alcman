@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub mod atproto;
 pub mod auth;
 pub mod books;
+pub mod claude;
 pub mod database;
 pub mod feed;
 pub mod gpt;

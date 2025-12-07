@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
 use crate::auth::{User, current_user, signups_disabled};
+use crate::claude::{ClaudeClient, ClaudeConfig};
 use crate::database::{BookUpdate, Database, NewBook};
 use crate::gpt::BookMetadata;
 use crate::gpt::{GptClient, GptConfig};
@@ -16,6 +17,88 @@ use crate::pds::AuthenticatedPds;
 use crate::templates::{
     BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate, BookListTemplate,
 };
+
+/// Check if a model name is a Claude model
+fn is_claude_model(model: &str) -> bool {
+    model.starts_with("claude-")
+}
+
+/// Extract book metadata using either GPT or Claude based on model selection
+async fn extract_metadata_with_ai(query: &str, model: &str) -> Result<BookMetadata, String> {
+    if is_claude_model(model) {
+        let claude = ClaudeClient::new(ClaudeConfig::from_env());
+        if !claude.has_api_key() {
+            return Err("Claude API key not configured".to_string());
+        }
+        claude
+            .extract_book_metadata(query, model)
+            .await
+            .map(|m| BookMetadata {
+                title: m.title,
+                author: m.author,
+                publication_year: m.publication_year,
+            })
+            .map_err(|e| e.to_string())
+    } else {
+        let gpt = GptClient::new(GptConfig::from_env());
+        if !gpt.has_api_key() {
+            return Err("OpenAI API key not configured".to_string());
+        }
+        gpt.extract_book_metadata(query, model)
+            .await
+            .map_err(|e| e.to_string())
+    }
+}
+
+/// Edit book with instruction using either GPT or Claude based on model selection
+async fn edit_book_with_ai(
+    current_title: &str,
+    current_author: Option<&str>,
+    current_publication_year: Option<i32>,
+    instruction: &str,
+    model: &str,
+) -> Result<BookMetadata, String> {
+    if is_claude_model(model) {
+        let claude = ClaudeClient::new(ClaudeConfig::from_env());
+        if !claude.has_api_key() {
+            return Err("Claude API key not configured".to_string());
+        }
+        claude
+            .edit_book_with_instruction(
+                current_title,
+                current_author,
+                current_publication_year,
+                instruction,
+                model,
+            )
+            .await
+            .map(|r| BookMetadata {
+                title: r.title,
+                author: r.author,
+                publication_year: r.publication_year,
+            })
+            .map_err(|e| e.to_string())
+    } else {
+        let gpt = GptClient::new(GptConfig::from_env());
+        if !gpt.has_api_key() {
+            return Err("OpenAI API key not configured".to_string());
+        }
+        gpt.edit_book_with_instruction(
+            current_title,
+            current_author,
+            current_publication_year,
+            instruction,
+            model,
+        )
+        .await
+        .map(|r| BookMetadata {
+            title: r.title,
+            author: r.author,
+            publication_year: r.publication_year,
+        })
+        .map_err(|e| e.to_string())
+    }
+}
 
 // Book-related structures
 #[derive(sqlx::FromRow, Serialize, Clone)]
@@ -347,34 +430,19 @@ pub async fn book_edit_chat_submit(
         return Html(template.render().unwrap()).into_response();
     }
 
-    // Create GPT client and process the instruction
-    let gpt = GptClient::new(GptConfig::from_env());
-
-    if !gpt.has_api_key() {
-        let template = BookEditChatTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            book,
-            error_message: Some("AI features not available (API key not configured)".to_string()),
-            edit_result: None,
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
-    let edit_result = match gpt
-        .edit_book_with_instruction(
-            &book.title,
-            book.author.as_deref(),
-            book.publication_year,
-            instruction,
-            &form.model,
-        )
-        .await
+    // Edit book with AI (GPT or Claude based on model selection)
+    let edit_result = match edit_book_with_ai(
+        &book.title,
+        book.author.as_deref(),
+        book.publication_year,
+        instruction,
+        &form.model,
+    )
+    .await
     {
         Ok(result) => result,
         Err(error) => {
-            eprintln!("GPT error: {error}");
+            eprintln!("AI error: {error}");
             let template = BookEditChatTemplate {
                 is_authenticated: true,
                 signups_disabled: signups_disabled(),
@@ -385,6 +453,13 @@ pub async fn book_edit_chat_submit(
             };
             return Html(template.render().unwrap()).into_response();
         }
+    };
+
+    // Convert to BookEditResult for the template
+    let edit_result = crate::gpt::BookEditResult {
+        title: edit_result.title,
+        author: edit_result.author,
+        publication_year: edit_result.publication_year,
     };
 
     let template = BookEditChatTemplate {
@@ -485,26 +560,11 @@ pub async fn book_add_extract(
         return Html(template.render().unwrap()).into_response();
     }
 
-    // Create GPT client and extract metadata
-    let gpt = GptClient::new(GptConfig::from_env());
-
-    if !gpt.has_api_key() {
-        let template = BookAddTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            error_message: Some("AI features not available (API key not configured)".to_string()),
-            extracted_metadata: None,
-            model: form.model.clone(),
-            query: query.to_string(),
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
-    let metadata = match gpt.extract_book_metadata(query, &form.model).await {
+    // Extract metadata using AI (GPT or Claude based on model selection)
+    let metadata = match extract_metadata_with_ai(query, &form.model).await {
         Ok(m) => m,
         Err(error) => {
-            eprintln!("GPT error: {error}");
+            eprintln!("AI error: {error}");
             let template = BookAddTemplate {
                 is_authenticated: true,
                 signups_disabled: signups_disabled(),
@@ -565,31 +625,6 @@ pub async fn book_add_refine(
         return Html(template.render().unwrap()).into_response();
     }
 
-    // Create GPT client and process the instruction
-    let gpt = GptClient::new(GptConfig::from_env());
-
-    if !gpt.has_api_key() {
-        let metadata = BookMetadata {
-            title: form.title.clone(),
-            author: if form.author.trim().is_empty() {
-                None
-            } else {
-                Some(form.author.clone())
-            },
-            publication_year: form.publication_year.trim().parse::<i32>().ok(),
-        };
-        let template = BookAddTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            error_message: Some("AI features not available (API key not configured)".to_string()),
-            extracted_metadata: Some(metadata),
-            model: form.model,
-            query: form.query,
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
     let current_author = if form.author.trim().is_empty() {
         None
     } else {
@@ -597,19 +632,19 @@ pub async fn book_add_refine(
     };
     let current_publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    let edit_result = match gpt
-        .edit_book_with_instruction(
-            &form.title,
-            current_author,
-            current_publication_year,
-            instruction,
-            &form.model,
-        )
-        .await
+    // Edit book with AI (GPT or Claude based on model selection)
+    let metadata = match edit_book_with_ai(
+        &form.title,
+        current_author,
+        current_publication_year,
+        instruction,
+        &form.model,
+    )
+    .await
     {
         Ok(result) => result,
         Err(error) => {
-            eprintln!("GPT error: {error}");
+            eprintln!("AI error: {error}");
             let metadata = BookMetadata {
                 title: form.title.clone(),
                 author: current_author.map(|s| s.to_string()),
@@ -626,13 +661,6 @@ pub async fn book_add_refine(
             };
             return Html(template.render().unwrap()).into_response();
         }
-    };
-
-    // Convert BookEditResult to BookMetadata for the template
-    let metadata = BookMetadata {
-        title: edit_result.title,
-        author: edit_result.author,
-        publication_year: edit_result.publication_year,
     };
 
     let template = BookAddTemplate {
