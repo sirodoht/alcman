@@ -98,7 +98,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
     Html(template.render().unwrap()).into_response()
 }
 
-/// Show a public global feed with book entries from all users.
+/// Show a public global feed with book entries from all users on the PDS.
 pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
     let current = current_user(&db, &headers).await;
     let is_authenticated = current.is_some();
@@ -117,22 +117,28 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         return Html(template.render().unwrap()).into_response();
     };
 
-    let users = match db.get_all_users().await {
-        Ok(users) => users,
+    // Get all repositories from the PDS (not just local users)
+    let repos = match pds_client.list_repos(Some(100)).await {
+        Ok(repos) => repos,
         Err(error) => {
-            eprintln!("Error fetching users: {error}");
+            eprintln!("Error fetching repos from PDS: {error}");
             vec![]
         }
     };
 
     let mut feed_items: Vec<FeedItem> = Vec::new();
 
-    for user in users {
-        let Some(did) = user.did.clone() else {
-            continue;
+    for repo in repos {
+        let did = &repo.did;
+
+        // Try to look up user in local database for username
+        let author_username = match db.get_user_by_did(did).await {
+            Ok(Some(user)) => user.username,
+            _ => did.clone(), // Use DID as fallback if user not in local DB
         };
 
-        let entries = match pds_client.list_book_entries(&did).await {
+        // Fetch book entries for this repo
+        let entries = match pds_client.list_book_entries(did).await {
             Ok(entries) => entries,
             Err(error) => {
                 eprintln!("Error fetching book entries for {did}: {error}");
@@ -143,7 +149,7 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         for entry in entries {
             feed_items.push(FeedItem {
                 entry: entry.value,
-                author_username: user.username.clone(),
+                author_username: author_username.clone(),
                 author_did: did.clone(),
             });
         }

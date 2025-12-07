@@ -220,6 +220,44 @@ pub struct DeleteRecordRequest {
     pub rkey: String,
 }
 
+/// Response from com.atproto.sync.listRepos
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ListReposResponse {
+    pub repos: Vec<RepoInfo>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+}
+
+/// Repository info from listRepos
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RepoInfo {
+    pub did: String,
+    #[serde(default)]
+    pub head: Option<String>,
+    #[serde(default)]
+    pub rev: Option<String>,
+    #[serde(default)]
+    pub active: Option<bool>,
+    #[serde(default)]
+    pub status: Option<String>,
+}
+
+/// Response from com.atproto.repo.describeRepo
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DescribeRepoResponse {
+    pub handle: String,
+    pub did: String,
+    #[serde(default)]
+    pub did_doc: Option<serde_json::Value>,
+    #[serde(default)]
+    pub collections: Option<Vec<String>>,
+    #[serde(default)]
+    pub handle_is_correct: Option<bool>,
+}
+
 pub type AtprotoResult<T> = Result<T, AtprotoError>;
 
 #[derive(Debug)]
@@ -549,6 +587,59 @@ impl PdsClient {
             .list_records(did, "app.alcman.book.entry", Some(100))
             .await?;
         Ok(response.records)
+    }
+
+    /// List all repositories on the PDS.
+    ///
+    /// Calls com.atproto.sync.listRepos (public, no auth required)
+    pub async fn list_repos(&self, limit: Option<u32>) -> AtprotoResult<Vec<RepoInfo>> {
+        let mut url = format!("{}/xrpc/com.atproto.sync.listRepos", self.pds_url);
+
+        if let Some(limit) = limit {
+            url.push_str(&format!("?limit={}", limit));
+        }
+
+        let response = self.client.get(&url).send().await?;
+
+        if response.status().is_success() {
+            let result: ListReposResponse = response.json().await?;
+            Ok(result.repos)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
+    }
+
+    /// Describe a repository (get handle and other info).
+    ///
+    /// Calls com.atproto.repo.describeRepo (public, no auth required)
+    pub async fn describe_repo(&self, repo: &str) -> AtprotoResult<DescribeRepoResponse> {
+        let url = format!(
+            "{}/xrpc/com.atproto.repo.describeRepo?repo={}",
+            self.pds_url, repo
+        );
+
+        let response = self.client.get(&url).send().await?;
+
+        if response.status().is_success() {
+            let result: DescribeRepoResponse = response.json().await?;
+            Ok(result)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
     }
 
     /// Delete a record from a user's repository.

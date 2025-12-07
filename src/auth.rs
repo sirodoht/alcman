@@ -306,21 +306,36 @@ pub async fn profile_by_did_page(
     Path(did): Path<String>,
 ) -> Response {
     let current = current_user(&db, &headers).await;
+    let pds_client = PdsClient::from_env();
 
-    // Look up the user by DID
-    let profile_user = match db.get_user_by_did(&did).await {
-        Ok(Some(user)) => user,
-        Ok(None) => {
-            return (StatusCode::NOT_FOUND, "Profile not found").into_response();
-        }
+    // Try to look up the user in local database first
+    let local_user = match db.get_user_by_did(&did).await {
+        Ok(user) => user,
         Err(error) => {
             eprintln!("Error fetching user by DID: {error}");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
+            None
         }
     };
 
+    // Determine the profile username - prefer local DB, fall back to PDS handle
+    let profile_username = if let Some(ref user) = local_user {
+        user.username.clone()
+    } else if let Some(ref client) = pds_client {
+        // Try to get handle from PDS
+        match client.describe_repo(&did).await {
+            Ok(repo_info) => repo_info.handle,
+            Err(error) => {
+                eprintln!("Error fetching repo info from PDS: {error}");
+                // Repo doesn't exist on PDS either
+                return (StatusCode::NOT_FOUND, "Profile not found").into_response();
+            }
+        }
+    } else {
+        // No PDS configured and user not in local DB
+        return (StatusCode::NOT_FOUND, "Profile not found").into_response();
+    };
+
     // Fetch book entries from PDS
-    let pds_client = PdsClient::from_env();
     let book_entries = match &pds_client {
         Some(client) => match client.list_book_entries(&did).await {
             Ok(entries) => entries,
@@ -333,11 +348,10 @@ pub async fn profile_by_did_page(
     };
 
     // Determine if current user can follow this profile
-    // (logged in, different user, both have DIDs)
+    // (logged in, different user, current user has DID)
     let current_did = current.as_ref().and_then(|u| u.did.clone());
-    let can_follow = current.is_some()
-        && profile_user.did.is_some()
-        && current_did.as_deref() != profile_user.did.as_deref();
+    let can_follow =
+        current.is_some() && current_did.is_some() && current_did.as_deref() != Some(&did);
 
     // Check if current user is already following this profile
     let is_following = if can_follow {
@@ -366,8 +380,8 @@ pub async fn profile_by_did_page(
         is_authenticated: current.is_some(),
         signups_disabled: signups_disabled(),
         username: current_username,
-        profile_username: profile_user.username,
-        profile_did: profile_user.did,
+        profile_username,
+        profile_did: Some(did),
         book_entries,
         can_follow,
         is_following,
