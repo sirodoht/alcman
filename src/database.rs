@@ -96,11 +96,8 @@ impl Database {
                 .is_some();
 
             if executed {
-                println!("Migration {} already executed, skipping", filename);
                 continue;
             }
-
-            println!("Executing migration: {}", filename);
 
             // Read and execute migration file
             let migration_sql = fs::read_to_string(entry.path())?;
