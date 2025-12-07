@@ -10,7 +10,7 @@ use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
 use crate::auth::{User, current_user, signups_disabled};
 use crate::claude::{ClaudeClient, ClaudeConfig};
-use crate::database::{BookUpdate, Database, NewBook};
+use crate::database::{BookUpdate, Database};
 use crate::gpt::BookMetadata;
 use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
@@ -708,13 +708,11 @@ pub async fn book_add_save(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    let new_book = NewBook {
-        title,
-        author,
-        publication_year,
-    };
-
-    match db.create_book(new_book).await {
+    // Use find_or_create to avoid duplicates
+    match db
+        .find_or_create_book(title, author, publication_year)
+        .await
+    {
         Ok(book_id) => {
             // Sync book to PDS (don't fail if this errors)
             sync_book_to_pds(&db, &user, title, author, publication_year).await;
