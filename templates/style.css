@@ -385,7 +385,7 @@ select:focus {
     gap: 6px;
 }
 
-.feed-entry-title {
+.feed-entry-title a {
     font-size: 20px;
     font-weight: 600;
     color: #2c3e50;

@@ -59,5 +59,27 @@
         </div>
     </div>
 
+    {% if !activities.is_empty() %}
+    <div class="page-row">
+        <div class="page-header">
+            <h2>activity</h2>
+        </div>
+    </div>
+    {% for activity in activities %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-value">
+                {% if activity.username != activity.did %}
+                <a href="/profile/{{ activity.did }}">{{ activity.username }}</a> ({{ activity.did }})
+                {% else %}
+                <a href="/profile/{{ activity.did }}">{{ activity.did }}</a>
+                {% endif %}
+                {{ activity.action }} this book on {{ activity.created_date() }}
+            </span>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
 </section>
 {% endblock content %}

@@ -41,6 +41,7 @@ pub struct BookDetailTemplate {
     pub signups_disabled: bool,
     pub username: String,
     pub book: Book,
+    pub activities: Vec<crate::books::BookActivity>,
 }
 
 #[derive(Template)]

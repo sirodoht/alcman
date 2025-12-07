@@ -189,16 +189,10 @@ impl GptClient {
             .to_string();
 
         // Log the request
-        println!("OpenAI API Request:");
-        println!("  URL: {}", OPENAI_CHAT_COMPLETIONS_URL);
-        println!("  Model: {}", request.model);
-        for msg in &request.messages {
-            println!(
-                "  [{role}]: {content}",
-                role = msg.role,
-                content = msg.content
-            );
-        }
+        println!(
+            "[HTTP] POST {} (model: {})",
+            OPENAI_CHAT_COMPLETIONS_URL, request.model
+        );
 
         let response = self
             .http
@@ -218,16 +212,6 @@ impl GptClient {
         }
 
         let payload = response.bytes().await.map_err(GptError::Http)?;
-
-        match std::str::from_utf8(&payload) {
-            Ok(raw) => {
-                println!("OpenAI API Raw Response:");
-                println!("{}", raw);
-            }
-            Err(_) => {
-                println!("OpenAI API Raw Response: [could not decode response as UTF-8]");
-            }
-        }
 
         serde_json::from_slice(&payload).map_err(GptError::Json)
     }

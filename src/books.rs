@@ -7,7 +7,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
-use crate::atproto::{BookRef, PdsClient};
+use crate::atproto::{BookRef, PdsClient, resolve_handle_from_plc};
 use crate::auth::{User, current_user, signups_disabled};
 use crate::claude::{ClaudeClient, ClaudeConfig};
 use crate::database::{BookUpdate, Database};
@@ -111,6 +111,24 @@ pub struct Book {
 }
 
 impl Book {
+    pub fn created_date(&self) -> &str {
+        self.created_at
+            .split('T')
+            .next()
+            .unwrap_or(&self.created_at)
+    }
+}
+
+/// Activity record showing who interacted with a book
+#[derive(Clone)]
+pub struct BookActivity {
+    pub username: String,
+    pub did: String,
+    pub action: String,
+    pub created_at: String,
+}
+
+impl BookActivity {
     pub fn created_date(&self) -> &str {
         self.created_at
             .split('T')
@@ -224,22 +242,83 @@ pub async fn book_detail(
 ) -> Response {
     let user = current_user(&db, &headers).await;
 
-    match db.get_book_by_id(&book_id).await {
-        Ok(Some(book)) => {
-            let template = BookDetailTemplate {
-                is_authenticated: user.is_some(),
-                signups_disabled: signups_disabled(),
-                username: user.map(|u| u.username).unwrap_or_default(),
-                book,
-            };
-            Html(template.render().unwrap()).into_response()
-        }
-        Ok(None) => Redirect::to("/").into_response(),
+    let book = match db.get_book_by_id(&book_id).await {
+        Ok(Some(book)) => book,
+        Ok(None) => return Redirect::to("/").into_response(),
         Err(error) => {
             eprintln!("Error fetching book: {error}");
-            Redirect::to("/").into_response()
+            return Redirect::to("/").into_response();
         }
+    };
+
+    // Fetch activity from PDS
+    let mut activities: Vec<BookActivity> = Vec::new();
+
+    if let Some(pds_client) = PdsClient::from_env() {
+        // Get all repositories from the PDS
+        let repos = match pds_client.list_repos(Some(100)).await {
+            Ok(repos) => repos,
+            Err(error) => {
+                eprintln!("Error fetching repos from PDS: {error}");
+                vec![]
+            }
+        };
+
+        for repo in repos {
+            let did = &repo.did;
+
+            // Look up username from local database, or resolve handle from PLC directory
+            let username = match db.get_user_by_did(did).await {
+                Ok(Some(user)) => user.username,
+                _ => {
+                    // Resolve handle from PLC directory (works for any did:plc)
+                    resolve_handle_from_plc(did)
+                        .await
+                        .unwrap_or_else(|| did.clone())
+                }
+            };
+
+            // Fetch book entries for this repo
+            let entries = match pds_client.list_book_entries(did).await {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+
+            // Check if any entry matches this book
+            for entry in entries {
+                let entry_book = &entry.value.book;
+                let title_matches = entry_book.title.to_lowercase() == book.title.to_lowercase();
+                let author_matches = match (&entry_book.authors, &book.author) {
+                    (Some(authors), Some(book_author)) => authors
+                        .iter()
+                        .any(|a| a.to_lowercase() == book_author.to_lowercase()),
+                    (None, None) => true,
+                    _ => false,
+                };
+
+                if title_matches && author_matches {
+                    activities.push(BookActivity {
+                        username: username.clone(),
+                        did: did.clone(),
+                        action: "added".to_string(),
+                        created_at: entry.value.created_at.clone(),
+                    });
+                }
+            }
+        }
+
+        // Sort by created_at descending (most recent first)
+        activities.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     }
+
+    let template = BookDetailTemplate {
+        is_authenticated: user.is_some(),
+        signups_disabled: signups_disabled(),
+        username: user.map(|u| u.username).unwrap_or_default(),
+        book,
+        activities,
+    };
+    Html(template.render().unwrap()).into_response()
 }
 
 pub async fn book_delete(

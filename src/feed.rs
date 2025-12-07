@@ -81,6 +81,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
                 entry: entry.value,
                 author_username: user.username.clone(),
                 author_did: subject_did.clone(),
+                book_id: None,
             });
         }
     }
@@ -150,7 +151,7 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         for entry in entries {
             // Save book to local database (deduplicates by title/author/year)
             let book = &entry.value.book;
-            if let Err(error) = db
+            let book_id = match db
                 .find_or_create_book(
                     &book.title,
                     book.authors
@@ -161,13 +162,18 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
                 )
                 .await
             {
-                eprintln!("Error saving book to database: {error}");
-            }
+                Ok(id) => Some(id),
+                Err(error) => {
+                    eprintln!("Error saving book to database: {error}");
+                    None
+                }
+            };
 
             feed_items.push(FeedItem {
                 entry: entry.value,
                 author_username: author_username.clone(),
                 author_did: did.clone(),
+                book_id,
             });
         }
     }

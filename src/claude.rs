@@ -188,19 +188,10 @@ impl ClaudeClient {
             .to_string();
 
         // Log the request
-        println!("Anthropic API Request:");
-        println!("  URL: {}", ANTHROPIC_MESSAGES_URL);
-        println!("  Model: {}", request.model);
-        if let Some(ref system) = request.system {
-            println!("  [system]: {}", system);
-        }
-        for msg in &request.messages {
-            println!(
-                "  [{role}]: {content}",
-                role = msg.role,
-                content = msg.content
-            );
-        }
+        println!(
+            "[HTTP] POST {} (model: {})",
+            ANTHROPIC_MESSAGES_URL, request.model
+        );
 
         let response = self
             .http
@@ -221,16 +212,6 @@ impl ClaudeClient {
         }
 
         let payload = response.bytes().await.map_err(ClaudeError::Http)?;
-
-        match std::str::from_utf8(&payload) {
-            Ok(raw) => {
-                println!("Anthropic API Raw Response:");
-                println!("{}", raw);
-            }
-            Err(_) => {
-                println!("Anthropic API Raw Response: [could not decode response as UTF-8]");
-            }
-        }
 
         serde_json::from_slice(&payload).map_err(ClaudeError::Json)
     }

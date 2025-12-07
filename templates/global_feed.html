@@ -22,7 +22,15 @@
     <div class="feed-entry">
         <div class="feed-entry-content">
             <div class="feed-entry-header">
+                {% if let Some(id) = item.book_id %}
+                <h2 class="feed-entry-title">
+                    <a href="/books/{{ id }}">
+                            {{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}
+                    </a>
+                </h2>
+                {% else %}
                 <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
+                {% endif %}
                 {% if let Some(authors) = item.entry.book.authors %}
                 <p class="feed-entry-author">{{ authors.join(", ") }}</p>
                 {% endif %}

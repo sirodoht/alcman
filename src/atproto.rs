@@ -1,9 +1,49 @@
 use serde::{Deserialize, Serialize};
 
+const PLC_DIRECTORY_URL: &str = "https://plc.directory";
+
 /// AT Protocol PDS client for making XRPC calls.
 pub struct PdsClient {
     client: reqwest::Client,
     pds_url: String,
+}
+
+/// Response from PLC Directory for a DID document
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PlcDidDocument {
+    pub id: String,
+    #[serde(default)]
+    pub also_known_as: Vec<String>,
+}
+
+/// Resolve a DID to a handle via plc.directory.
+/// Works for any did:plc DID regardless of which PDS hosts the account.
+pub async fn resolve_handle_from_plc(did: &str) -> Option<String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/{}", PLC_DIRECTORY_URL, did);
+
+    println!("[HTTP] GET {}", url);
+
+    let response = match client.get(&url).send().await {
+        Ok(r) => r,
+        Err(_) => return None,
+    };
+
+    if !response.status().is_success() {
+        return None;
+    }
+
+    let doc: PlcDidDocument = match response.json().await {
+        Ok(d) => d,
+        Err(_) => return None,
+    };
+
+    // Extract handle from alsoKnownAs (format: "at://handle.example.com")
+    doc.also_known_as
+        .into_iter()
+        .find(|s| s.starts_with("at://"))
+        .map(|s| s.trim_start_matches("at://").to_string())
 }
 
 // ============================================================================
@@ -190,6 +230,8 @@ pub struct FeedItem {
     pub author_username: String,
     /// DID of the author
     pub author_did: String,
+    /// Local database book ID (if available)
+    pub book_id: Option<String>,
 }
 
 /// Request to delete a record via com.atproto.repo.deleteRecord
@@ -316,6 +358,8 @@ impl PdsClient {
     ) -> AtprotoResult<CreateAccountResponse> {
         let url = format!("{}/xrpc/com.atproto.server.createAccount", self.pds_url);
 
+        println!("[HTTP] POST {} (handle: {})", url, handle);
+
         let request = CreateAccountRequest {
             handle: handle.to_string(),
             email: email.map(String::from),
@@ -349,6 +393,8 @@ impl PdsClient {
         password: &str,
     ) -> AtprotoResult<CreateSessionResponse> {
         let url = format!("{}/xrpc/com.atproto.server.createSession", self.pds_url);
+
+        println!("[HTTP] POST {} (identifier: {})", url, identifier);
 
         let request = CreateSessionRequest {
             identifier: identifier.to_string(),
@@ -401,6 +447,8 @@ impl PdsClient {
     ) -> AtprotoResult<RefreshSessionResponse> {
         let url = format!("{}/xrpc/com.atproto.server.refreshSession", self.pds_url);
 
+        println!("[HTTP] POST {}", url);
+
         let response = self
             .client
             .post(&url)
@@ -434,6 +482,8 @@ impl PdsClient {
         record: T,
     ) -> AtprotoResult<CreateRecordResponse> {
         let url = format!("{}/xrpc/com.atproto.repo.createRecord", self.pds_url);
+
+        println!("[HTTP] POST {} (collection: {})", url, collection);
 
         let request = CreateRecordRequest {
             repo: repo.to_string(),
@@ -508,6 +558,8 @@ impl PdsClient {
             url.push_str(&format!("&limit={}", limit));
         }
 
+        println!("[HTTP] GET {}", url);
+
         let response = self.client.get(&url).send().await?;
 
         if response.status().is_success() {
@@ -542,6 +594,8 @@ impl PdsClient {
         if let Some(limit) = limit {
             url.push_str(&format!("&limit={}", limit));
         }
+
+        println!("[HTTP] GET {}", url);
 
         let response = self.client.get(&url).send().await?;
 
@@ -581,6 +635,8 @@ impl PdsClient {
             url.push_str(&format!("?limit={}", limit));
         }
 
+        println!("[HTTP] GET {}", url);
+
         let response = self.client.get(&url).send().await?;
 
         if response.status().is_success() {
@@ -606,6 +662,8 @@ impl PdsClient {
             "{}/xrpc/com.atproto.repo.describeRepo?repo={}",
             self.pds_url, repo
         );
+
+        println!("[HTTP] GET {}", url);
 
         let response = self.client.get(&url).send().await?;
 
@@ -635,6 +693,11 @@ impl PdsClient {
         rkey: &str,
     ) -> AtprotoResult<()> {
         let url = format!("{}/xrpc/com.atproto.repo.deleteRecord", self.pds_url);
+
+        println!(
+            "[HTTP] POST {} (collection: {}, rkey: {})",
+            url, collection, rkey
+        );
 
         let request = DeleteRecordRequest {
             repo: repo.to_string(),
