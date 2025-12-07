@@ -165,6 +165,17 @@ pub struct BookRef {
     pub isbn: Option<String>,
 }
 
+impl BookRef {
+    /// Get the first letter of the book title, uppercased, or '?' if empty
+    pub fn first_letter(&self) -> char {
+        self.title
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().next().unwrap_or(c))
+            .unwrap_or('?')
+    }
+}
+
 /// A user's book entry record (app.alcman.book.entry)
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]

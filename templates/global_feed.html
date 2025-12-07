@@ -22,61 +22,101 @@
         {% for item in feed_items %}
         <article class="feed-entry">
             <div class="feed-entry-content">
-                <div class="feed-entry-header">
-                    {% if let Some(id) = item.book_id %}
-                    <h2 class="feed-entry-title">
+                <div class="feed-entry-user-section">
+                    <div class="feed-entry-user-avatar">
+                        <a href="/profile/{{ item.author_did }}"></a>
+                    </div>
+                    <div class="feed-entry-user-info">
+                        <span class="feed-entry-user-action">
+                            <a href="/profile/{{ item.author_did }}" class="feed-entry-username">{{ item.author_username }}</a>
+                            {% if let Some(status) = item.entry.status %}
+                                {% if status == "reading" %}
+                                is reading
+                                {% elif status == "finished" %}
+                                finished
+                                {% elif status == "wantToRead" %}
+                                wants to read
+                                {% elif status == "dropped" %}
+                                did not finish
+                                {% else %}
+                                updated
+                                {% endif %}
+                            {% else %}
+                            added
+                            {% endif %}
+                        </span>
+                        <span class="feed-entry-timestamp">{{ item.entry.created_date() }}</span>
+                    </div>
+                </div>
+
+                <div class="feed-entry-book-section">
+                    <div class="feed-entry-book-cover">
+                        {% if let Some(id) = item.book_id %}
                         <a href="/books/{{ id }}">
-                            {{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}
+                            <div class="feed-entry-book-cover-placeholder">
+                                <span class="feed-entry-book-cover-letter">{{ item.entry.book.first_letter() }}</span>
+                            </div>
                         </a>
-                    </h2>
-                    {% else %}
-                    <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
-                    {% endif %}
-                    {% if let Some(authors) = item.entry.book.authors %}
-                    <p class="feed-entry-author">{{ authors.join(", ") }}</p>
-                    {% endif %}
-                    {% if let Some(isbn) = item.entry.book.isbn %}
-                    <p class="feed-entry-isbn">ISBN: {{ isbn }}</p>
-                    {% endif %}
-                </div>
+                        {% else %}
+                        <div class="feed-entry-book-cover-placeholder">
+                            <span class="feed-entry-book-cover-letter">{{ item.entry.book.first_letter() }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
 
-                {% if let Some(status) = item.entry.status %}
-                <div class="feed-entry-status-section">
-                    {% if status == "reading" %}
-                    <span class="feed-entry-status feed-entry-status-reading">reading</span>
-                    {% elif status == "finished" %}
-                    <span class="feed-entry-status feed-entry-status-finished">finished</span>
-                    {% elif status == "wantToRead" %}
-                    <span class="feed-entry-status feed-entry-status-wanttoread">want to read</span>
-                    {% elif status == "dropped" %}
-                    <span class="feed-entry-status feed-entry-status-dropped">did not finish</span>
-                    {% else %}
-                    <span class="feed-entry-status">{{ status }}</span>
-                    {% endif %}
-                </div>
-                {% endif %}
+                    <div class="feed-entry-book-info">
+                        <div class="feed-entry-book-header">
+                            {% if let Some(id) = item.book_id %}
+                            <h2 class="feed-entry-title">
+                                <a href="/books/{{ id }}">
+                                    {{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}
+                                </a>
+                            </h2>
+                            {% else %}
+                            <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
+                            {% endif %}
+                            {% if let Some(authors) = item.entry.book.authors %}
+                            <p class="feed-entry-author">by {{ authors.join(", ") }}</p>
+                            {% endif %}
+                        </div>
 
-                {% if let Some(notes) = item.entry.notes %}
-                <div class="feed-entry-notes">
-                    <p>{{ notes }}</p>
-                </div>
-                {% endif %}
+                        {% if let Some(status) = item.entry.status %}
+                        <div class="feed-entry-status-section">
+                            {% if status == "reading" %}
+                            <span class="feed-entry-status feed-entry-status-reading">reading</span>
+                            {% elif status == "finished" %}
+                            <span class="feed-entry-status feed-entry-status-finished">finished</span>
+                            {% elif status == "wantToRead" %}
+                            <span class="feed-entry-status feed-entry-status-wanttoread">want to read</span>
+                            {% elif status == "dropped" %}
+                            <span class="feed-entry-status feed-entry-status-dropped">did not finish</span>
+                            {% else %}
+                            <span class="feed-entry-status">{{ status }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
 
-                <div class="feed-entry-dates">
-                    {% if let Some(started_at) = item.formatted_started_at() %}
-                    <span class="feed-entry-date">started: {{ started_at }}</span>
-                    {% endif %}
-                    {% if let Some(finished_at) = item.formatted_finished_at() %}
-                    <span class="feed-entry-date">finished: {{ finished_at }}</span>
-                    {% endif %}
-                    <span class="feed-entry-date">added: {{ item.entry.created_date() }}</span>
-                </div>
+                        {% if let Some(notes) = item.entry.notes %}
+                        <div class="feed-entry-notes">
+                            <p>{{ notes }}</p>
+                        </div>
+                        {% endif %}
 
-                <div class="feed-entry-footer">
-                    <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
-                    {% if is_authenticated && item.is_from_other_user(current_did) %}
-                    <a href="/books/include?title={{ item.entry.book.title|urlencode }}{% if let Some(authors) = item.entry.book.authors %}&amp;author={{ authors.join(", ")|urlencode }}{% endif %}{% if let Some(year) = item.entry.book.publication_year %}&amp;year={{ year }}{% endif %}" class="feed-entry-add-btn">add to library</a>
-                    {% endif %}
+                        <div class="feed-entry-dates">
+                            {% if let Some(started_at) = item.formatted_started_at() %}
+                            <span class="feed-entry-date">started: {{ started_at }}</span>
+                            {% endif %}
+                            {% if let Some(finished_at) = item.formatted_finished_at() %}
+                            <span class="feed-entry-date">finished: {{ finished_at }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if is_authenticated && item.is_from_other_user(current_did) %}
+                        <div class="feed-entry-actions">
+                            <a href="/books/include?title={{ item.entry.book.title|urlencode }}{% if let Some(authors) = item.entry.book.authors %}&amp;author={{ authors.join(", ")|urlencode }}{% endif %}{% if let Some(year) = item.entry.book.publication_year %}&amp;year={{ year }}{% endif %}" class="feed-entry-add-btn">add to library</a>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </article>
