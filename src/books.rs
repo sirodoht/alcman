@@ -201,18 +201,19 @@ pub async fn book_list(State(db): State<AppState>, headers: HeaderMap) -> impl I
     Html(template.render().unwrap())
 }
 
-/// Sync a book entry to the user's AT Protocol PDS.
-/// Logs errors but does not propagate them.
-async fn sync_book_to_pds(
-    db: &Database,
-    user: &User,
-    title: &str,
-    author: Option<&str>,
+/// Data needed to sync a book entry to the PDS
+struct PdsBookEntry<'a> {
+    title: &'a str,
+    author: Option<&'a str>,
     publication_year: Option<i32>,
     status: Option<String>,
     started_at: Option<String>,
     finished_at: Option<String>,
-) {
+}
+
+/// Sync a book entry to the user's AT Protocol PDS.
+/// Logs errors but does not propagate them.
+async fn sync_book_to_pds(db: &Database, user: &User, entry: PdsBookEntry<'_>) {
     let Some(pds_client) = PdsClient::from_env() else {
         // PDS not configured
         return;
@@ -225,19 +226,22 @@ async fn sync_book_to_pds(
 
     // Create book reference
     let book_ref = BookRef {
-        title: title.to_string(),
-        authors: author.map(|a| vec![a.to_string()]),
-        publication_year,
+        title: entry.title.to_string(),
+        authors: entry.author.map(|a| vec![a.to_string()]),
+        publication_year: entry.publication_year,
         isbn: None,
     };
 
     // Create book entry on PDS
     match auth_pds
-        .create_book_entry(book_ref, status, started_at, finished_at)
+        .create_book_entry(book_ref, entry.status, entry.started_at, entry.finished_at)
         .await
     {
         Ok(response) => {
-            println!("Synced book to PDS: {} (uri: {})", title, response.uri);
+            println!(
+                "Synced book to PDS: {} (uri: {})",
+                entry.title, response.uri
+            );
         }
         Err(error) => {
             eprintln!("Failed to sync book to PDS: {error}");
@@ -430,12 +434,14 @@ pub async fn book_edit_submit(
                 sync_book_to_pds(
                     &db,
                     &user,
-                    &book.title,
-                    book.author.as_deref(),
-                    book.publication_year,
-                    None,
-                    None,
-                    None,
+                    PdsBookEntry {
+                        title: &book.title,
+                        author: book.author.as_deref(),
+                        publication_year: book.publication_year,
+                        status: None,
+                        started_at: None,
+                        finished_at: None,
+                    },
                 )
                 .await;
             }
@@ -838,12 +844,14 @@ pub async fn book_add_save(
             sync_book_to_pds(
                 &db,
                 &user,
-                title,
-                author,
-                publication_year,
-                status,
-                started_at,
-                finished_at,
+                PdsBookEntry {
+                    title,
+                    author,
+                    publication_year,
+                    status,
+                    started_at,
+                    finished_at,
+                },
             )
             .await;
             Redirect::to(&format!("/books/{}", book_id)).into_response()
@@ -990,12 +998,14 @@ pub async fn book_include_save(
     sync_book_to_pds(
         &db,
         &user,
-        title,
-        author,
-        publication_year,
-        status,
-        started_at,
-        finished_at,
+        PdsBookEntry {
+            title,
+            author,
+            publication_year,
+            status,
+            started_at,
+            finished_at,
+        },
     )
     .await;
 
