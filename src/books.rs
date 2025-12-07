@@ -178,6 +178,9 @@ pub struct BookAddSaveForm {
     pub title: String,
     pub author: String,
     pub publication_year: String,
+    pub status: String,
+    pub started_at: String,
+    pub finished_at: String,
     pub model: String,
     pub query: String,
 }
@@ -204,6 +207,9 @@ async fn sync_book_to_pds(
     title: &str,
     author: Option<&str>,
     publication_year: Option<i32>,
+    status: Option<String>,
+    started_at: Option<String>,
+    finished_at: Option<String>,
 ) {
     let Some(pds_client) = PdsClient::from_env() else {
         // PDS not configured
@@ -224,7 +230,10 @@ async fn sync_book_to_pds(
     };
 
     // Create book entry on PDS
-    match auth_pds.create_book_entry(book_ref).await {
+    match auth_pds
+        .create_book_entry(book_ref, status, started_at, finished_at)
+        .await
+    {
         Ok(response) => {
             println!("Synced book to PDS: {} (uri: {})", title, response.uri);
         }
@@ -414,7 +423,7 @@ pub async fn book_edit_submit(
 
     match db.update_book(&book_id, update).await {
         Ok(_) => {
-            // Sync updated book to PDS
+            // Sync updated book to PDS (status/dates are None for edits, we don't change them)
             if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
                 sync_book_to_pds(
                     &db,
@@ -422,6 +431,9 @@ pub async fn book_edit_submit(
                     &book.title,
                     book.author.as_deref(),
                     book.publication_year,
+                    None,
+                    None,
+                    None,
                 )
                 .await;
             }
@@ -787,6 +799,26 @@ pub async fn book_add_save(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
+    // Parse status, defaulting to wantToRead if empty
+    let status = if form.status.trim().is_empty() {
+        Some("wantToRead".to_string())
+    } else {
+        Some(form.status.trim().to_string())
+    };
+
+    // Parse dates (convert from YYYY-MM-DD to RFC3339 format)
+    let started_at = if form.started_at.trim().is_empty() {
+        None
+    } else {
+        Some(format!("{}T00:00:00Z", form.started_at.trim()))
+    };
+
+    let finished_at = if form.finished_at.trim().is_empty() {
+        None
+    } else {
+        Some(format!("{}T00:00:00Z", form.finished_at.trim()))
+    };
+
     // Use find_or_create to avoid duplicates
     match db
         .find_or_create_book(title, author, publication_year)
@@ -794,7 +826,17 @@ pub async fn book_add_save(
     {
         Ok(book_id) => {
             // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(&db, &user, title, author, publication_year).await;
+            sync_book_to_pds(
+                &db,
+                &user,
+                title,
+                author,
+                publication_year,
+                status,
+                started_at,
+                finished_at,
+            )
+            .await;
             Redirect::to(&format!("/books/{}", book_id)).into_response()
         }
         Err(error) => {

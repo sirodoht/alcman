@@ -107,10 +107,20 @@ impl<'a> AuthenticatedPds<'a> {
     pub async fn create_book_entry(
         &mut self,
         book: BookRef,
+        status: Option<String>,
+        started_at: Option<String>,
+        finished_at: Option<String>,
     ) -> AtprotoResult<CreateRecordResponse> {
         let result = self
             .client
-            .create_book_entry(&self.access_jwt, &self.did, book.clone())
+            .create_book_entry(
+                &self.access_jwt,
+                &self.did,
+                book.clone(),
+                status.clone(),
+                started_at.clone(),
+                finished_at.clone(),
+            )
             .await;
 
         if let Err(ref error) = result
@@ -119,7 +129,14 @@ impl<'a> AuthenticatedPds<'a> {
         {
             return self
                 .client
-                .create_book_entry(&self.access_jwt, &self.did, book)
+                .create_book_entry(
+                    &self.access_jwt,
+                    &self.did,
+                    book,
+                    status,
+                    started_at,
+                    finished_at,
+                )
                 .await;
         }
 

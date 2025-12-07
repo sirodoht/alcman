@@ -191,15 +191,20 @@ pub struct BookEntryRecord {
 }
 
 impl BookEntryRecord {
-    /// Create a new book entry record
-    pub fn new(book: BookRef) -> Self {
+    /// Create a new book entry record with optional status and dates
+    pub fn new(
+        book: BookRef,
+        status: Option<String>,
+        started_at: Option<String>,
+        finished_at: Option<String>,
+    ) -> Self {
         Self {
             record_type: "app.alcman.book.entry".to_string(),
             book,
             notes: None,
-            status: None,
-            started_at: None,
-            finished_at: None,
+            status,
+            started_at,
+            finished_at,
             created_at: chrono::Utc::now().to_rfc3339(),
         }
     }
@@ -592,8 +597,11 @@ impl PdsClient {
         access_jwt: &str,
         did: &str,
         book: BookRef,
+        status: Option<String>,
+        started_at: Option<String>,
+        finished_at: Option<String>,
     ) -> AtprotoResult<CreateRecordResponse> {
-        let record = BookEntryRecord::new(book);
+        let record = BookEntryRecord::new(book, status, started_at, finished_at);
         self.create_record(access_jwt, did, "app.alcman.book.entry", record)
             .await
     }

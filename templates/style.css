@@ -1,4 +1,8 @@
 /* global */
+:root {
+    --width: 600px;
+}
+
 body {
     margin: 0;
     font-family: sans-serif;
@@ -11,7 +15,7 @@ header {
 }
 
 nav {
-    max-width: 614px;
+    max-width: calc(var(--width) + 14px);
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -72,7 +76,7 @@ main {
 }
 
 .page-content {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -91,7 +95,7 @@ main {
 }
 
 .page-header {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
 }
 
@@ -129,7 +133,7 @@ main {
 }
 
 .page-error {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     background-color: #f8d7da;
     color: #721c24;
@@ -137,7 +141,7 @@ main {
 }
 
 .page-success {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     background-color: #d4edda;
     color: #155724;
@@ -209,7 +213,7 @@ textarea {
     font-size: 16px;
     font-family: inherit;
     resize: vertical;
-    max-width: 600px;
+    max-width: var(--width);
     width: 100%;
 }
 textarea:focus {
@@ -246,7 +250,7 @@ select:focus {
 }
 
 .books-list-item-link {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -311,7 +315,7 @@ select:focus {
 }
 
 .filters-content {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     display: flex;
     gap: 16px;
@@ -347,7 +351,7 @@ select:focus {
 .page-notes {
     white-space: pre-wrap;
     text-align: left;
-    max-width: 600px;
+    max-width: var(--width);
     line-height: 1.2;
 }
 
@@ -364,13 +368,15 @@ select:focus {
 /* global feed */
 .global-feed {
     background-color: #f8f9fa;
+    min-height: 100vh;
 }
 
 .feed-empty {
     text-align: center;
     color: #6c757d;
-    padding: 48px 16px;
+    padding: 64px 16px;
     font-style: italic;
+    font-size: 15px;
 }
 
 .feed-entries {
@@ -382,127 +388,188 @@ select:focus {
 .feed-entry {
     background-color: white;
     border-bottom: 1px solid #e9ecef;
-    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+    transition: all 0.2s ease;
+    position: relative;
 }
-
 .feed-entry:hover {
-    background-color: #fafbfc;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background-color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.feed-entry:first-child {
+    border-top: 1px solid #e9ecef;
 }
 
 .feed-entry-content {
-    max-width: 600px;
+    max-width: var(--width);
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 20px 16px;
+    gap: 14px;
+    padding: 24px 20px;
+}
+@media (max-width: var(--width)) {
+    .feed-entry-content {
+        padding: 20px 16px;
+    }
 }
 
 .feed-entry-header {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .feed-entry-title {
     margin: 0;
-    font-size: 22px;
+    font-size: 24px;
     font-weight: 600;
-    color: #2c3e50;
-    line-height: 1.35;
+    color: #1a252f;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+}
+@media (max-width: var(--width)) {
+    .feed-entry-title {
+        font-size: 21px;
+    }
 }
 
 .feed-entry-title a {
     color: inherit;
     text-decoration: none;
-    transition: color 0.15s ease;
+    transition: color 0.2s ease;
+    display: inline-block;
 }
-
 .feed-entry-title a:hover {
-    color: #1a252f;
+    color: #2c3e50;
     text-decoration: underline;
-    text-decoration-thickness: 1.5px;
-    text-underline-offset: 2px;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
 }
 
 .feed-entry-year {
     font-weight: 400;
     color: #868e96;
-    font-size: 0.85em;
-    margin-left: 2px;
+    font-size: 0.8em;
+    margin-left: 4px;
+    font-variant-numeric: tabular-nums;
 }
 
 .feed-entry-author {
     color: #495057;
-    font-size: 16px;
+    font-size: 17px;
     margin: 0;
     line-height: 1.5;
     font-weight: 400;
+    font-style: italic;
+}
+@media (max-width: var(--width)) {
+    .feed-entry-author {
+        font-size: 16px;
+    }
 }
 
 .feed-entry-isbn {
     color: #868e96;
-    font-size: 13px;
+    font-size: 12px;
     margin: 0;
-    line-height: 1.4;
-    font-family: monospace;
+    line-height: 1.5;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    letter-spacing: 0.5px;
 }
 
 .feed-entry-status-section {
-    margin-top: 8px;
+    margin-top: 4px;
+    margin-bottom: 2px;
 }
 
 .feed-entry-status {
     display: inline-block;
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
     text-transform: lowercase;
+    letter-spacing: 0.3px;
+    line-height: 1.4;
 }
 
 .feed-entry-status-reading {
-    background-color: #cfe2ff;
-    color: #084298;
+    background-color: #e7f1ff;
+    color: #004085;
+    border: 1px solid #b3d7ff;
 }
 
 .feed-entry-status-finished {
-    background-color: #d1e7dd;
-    color: #0f5132;
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
 }
 
 .feed-entry-status-wanttoread {
-    background-color: #fff3cd;
-    color: #664d03;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #dee2e6;
 }
 
 .feed-entry-status-dropped {
-    background-color: #f8d7da;
-    color: #842029;
+    background-color: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
 }
 
 .feed-entry-dates {
     display: flex;
     flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 12px;
-    font-size: 12px;
-    color: #868e96;
+    gap: 16px;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f3f5;
+    font-size: 13px;
+    color: #6c757d;
+}
+@media (max-width: var(--width)) {
+    .feed-entry-dates {
+        flex-direction: column;
+        gap: 8px;
+    }
 }
 
 .feed-entry-date {
-    font-family: monospace;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 12px;
+    color: #868e96;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.feed-entry-date::before {
+    content: '•';
+    color: #dee2e6;
+    margin-right: 4px;
+}
+
+.feed-entry-date:first-child::before {
+    display: none;
+}
+@media (max-width: var(--width)) {
+    .feed-entry-date::before {
+        display: none;
+    }
 }
 
 .feed-entry-notes {
-    margin-top: 8px;
+    margin-top: 10px;
     color: #495057;
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.7;
     max-height: 300px;
     overflow: hidden;
     position: relative;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border-left: 3px solid #dee2e6;
 }
 
 .feed-entry-notes p {
@@ -517,46 +584,46 @@ select:focus {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 40px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 1));
+    height: 50px;
+    background: linear-gradient(to bottom, rgba(248, 249, 250, 0), rgba(248, 249, 250, 1));
     pointer-events: none;
+    border-radius: 0 0 6px 6px;
 }
 
 .feed-entry-footer {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 2px;
-    padding-top: 8px;
+    margin-top: 4px;
+    padding-top: 12px;
     border-top: 1px solid #f1f3f5;
     font-size: 13px;
-}
-
-.feed-entry-status {
-    background-color: #e9ecef;
-    color: #495057;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: lowercase;
 }
 
 .feed-entry-meta {
     color: #868e96;
     font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.feed-entry-meta::before {
+    content: '→';
+    color: #7b7a7a;
+    font-size: 12px;
 }
 
 .feed-entry-meta a {
     color: #495057;
     text-decoration: none;
-    font-weight: 500;
-    transition: color 0.15s ease;
+    font-weight: 600;
+    transition: all 0.2s ease;
 }
 
 .feed-entry-meta a:hover {
     color: #2c3e50;
     text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 1px;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 2px;
 }

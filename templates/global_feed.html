@@ -43,13 +43,13 @@
                 {% if let Some(status) = item.entry.status %}
                 <div class="feed-entry-status-section">
                     {% if status == "reading" %}
-                    <span class="feed-entry-status feed-entry-status-reading">{{ status }}</span>
+                    <span class="feed-entry-status feed-entry-status-reading">reading</span>
                     {% elif status == "finished" %}
-                    <span class="feed-entry-status feed-entry-status-finished">{{ status }}</span>
+                    <span class="feed-entry-status feed-entry-status-finished">finished</span>
                     {% elif status == "wantToRead" %}
-                    <span class="feed-entry-status feed-entry-status-wanttoread">{{ status }}</span>
+                    <span class="feed-entry-status feed-entry-status-wanttoread">want to read</span>
                     {% elif status == "dropped" %}
-                    <span class="feed-entry-status feed-entry-status-dropped">{{ status }}</span>
+                    <span class="feed-entry-status feed-entry-status-dropped">dropped</span>
                     {% else %}
                     <span class="feed-entry-status">{{ status }}</span>
                     {% endif %}
@@ -69,7 +69,7 @@
                     {% if let Some(finished_at) = item.formatted_finished_at() %}
                     <span class="feed-entry-date">finished: {{ finished_at }}</span>
                     {% endif %}
-                    <span class="feed-entry-date">{{ item.entry.created_date() }}</span>
+                    <span class="feed-entry-date">added: {{ item.entry.created_date() }}</span>
                 </div>
 
                 <div class="feed-entry-footer">
