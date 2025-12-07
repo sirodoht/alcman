@@ -475,4 +475,58 @@ impl Database {
         .await?;
         Ok(())
     }
+
+    /// Find a book by title and author, or create it if it doesn't exist.
+    /// If found and the existing record has no publication year but we have one, update it.
+    /// Returns the book ID.
+    pub async fn find_or_create_book(
+        &self,
+        title: &str,
+        author: Option<&str>,
+        publication_year: Option<i32>,
+    ) -> Result<String, DynError> {
+        // Try to find existing book with matching title and author
+        let existing =
+            sqlx::query("SELECT id, publication_year FROM books WHERE title = ? AND author IS ?")
+                .bind(title)
+                .bind(author)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        if let Some(row) = existing {
+            let book_id: String = row.get("id");
+            let existing_year: Option<i32> = row.get("publication_year");
+
+            // If we have a publication year and the existing one is NULL, update it
+            if publication_year.is_some() && existing_year.is_none() {
+                let now = chrono::Utc::now().to_rfc3339();
+                sqlx::query("UPDATE books SET publication_year = ?, updated_at = ? WHERE id = ?")
+                    .bind(publication_year)
+                    .bind(&now)
+                    .bind(&book_id)
+                    .execute(&self.pool)
+                    .await?;
+            }
+
+            return Ok(book_id);
+        }
+
+        // Create new book
+        let book_id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+
+        sqlx::query(
+            "INSERT INTO books (id, title, author, publication_year, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&book_id)
+        .bind(title)
+        .bind(author)
+        .bind(publication_year)
+        .bind(&now)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(book_id)
+    }
 }

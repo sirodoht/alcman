@@ -99,6 +99,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
 }
 
 /// Show a public global feed with book entries from all users on the PDS.
+/// Also saves any new books to the local database for deduplication.
 pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
     let current = current_user(&db, &headers).await;
     let is_authenticated = current.is_some();
@@ -147,6 +148,22 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         };
 
         for entry in entries {
+            // Save book to local database (deduplicates by title/author/year)
+            let book = &entry.value.book;
+            if let Err(error) = db
+                .find_or_create_book(
+                    &book.title,
+                    book.authors
+                        .as_ref()
+                        .and_then(|a| a.first())
+                        .map(|s| s.as_str()),
+                    book.publication_year,
+                )
+                .await
+            {
+                eprintln!("Error saving book to database: {error}");
+            }
+
             feed_items.push(FeedItem {
                 entry: entry.value,
                 author_username: author_username.clone(),
