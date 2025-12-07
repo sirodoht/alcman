@@ -1,10 +1,11 @@
 use askama::Template;
 use axum::{
-    extract::{Form, Path, State},
+    extract::{Form, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::AppState;
 use crate::atproto::{BookRef, PdsClient, resolve_handle_from_plc};
@@ -15,7 +16,8 @@ use crate::gpt::BookMetadata;
 use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
-    BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate, BookListTemplate,
+    BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate,
+    BookIncludeTemplate, BookListTemplate,
 };
 
 /// Check if a model name is a Claude model
@@ -606,12 +608,19 @@ pub async fn book_edit_chat_apply(
 
 // Combined add book page handlers
 
-pub async fn book_add_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn book_add_page(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> Response {
     let user = current_user(&db, &headers).await;
 
     if user.is_none() {
         return Redirect::to("/login").into_response();
     }
+
+    // Get prefilled query from URL parameter (e.g., /books/add?q=BookTitle+Author)
+    let prefill_query = params.get("q").cloned().unwrap_or_default();
 
     let template = BookAddTemplate {
         is_authenticated: true,
@@ -620,7 +629,7 @@ pub async fn book_add_page(State(db): State<AppState>, headers: HeaderMap) -> Re
         error_message: None,
         extracted_metadata: None,
         model: "gpt-5.1".to_string(),
-        query: String::new(),
+        query: prefill_query,
     };
 
     Html(template.render().unwrap()).into_response()
@@ -858,4 +867,137 @@ pub async fn book_add_save(
             Html(template.render().unwrap()).into_response()
         }
     }
+}
+
+// Book include page - add a book from the global feed to your library
+
+#[derive(Deserialize)]
+pub struct BookIncludeQuery {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub year: Option<String>,
+}
+
+pub async fn book_include_page(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<BookIncludeQuery>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let template = BookIncludeTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.username,
+        error_message: None,
+        title: params.title.unwrap_or_default(),
+        author: params.author.unwrap_or_default(),
+        publication_year: params.year.unwrap_or_default(),
+    };
+
+    Html(template.render().unwrap()).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct BookIncludeForm {
+    pub title: String,
+    pub author: String,
+    pub publication_year: String,
+    pub status: String,
+    pub started_at: String,
+    pub finished_at: String,
+}
+
+pub async fn book_include_save(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<BookIncludeForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let title = form.title.trim();
+    if title.is_empty() {
+        let template = BookIncludeTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Title is required".to_string()),
+            title: form.title,
+            author: form.author,
+            publication_year: form.publication_year,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    let author = if form.author.trim().is_empty() {
+        None
+    } else {
+        Some(form.author.trim())
+    };
+
+    let publication_year = form.publication_year.trim().parse::<i32>().ok();
+
+    // Parse status
+    let status = if form.status.trim().is_empty() {
+        Some("wantToRead".to_string())
+    } else {
+        Some(form.status.trim().to_string())
+    };
+
+    // Parse dates (convert from YYYY-MM-DD to RFC3339 format)
+    let started_at = if form.started_at.trim().is_empty() {
+        None
+    } else {
+        Some(format!("{}T00:00:00Z", form.started_at.trim()))
+    };
+
+    let finished_at = if form.finished_at.trim().is_empty() {
+        None
+    } else {
+        Some(format!("{}T00:00:00Z", form.finished_at.trim()))
+    };
+
+    // Save book to local database (deduplicates by title/author/year)
+    let book_id = match db
+        .find_or_create_book(title, author, publication_year)
+        .await
+    {
+        Ok(id) => id,
+        Err(error) => {
+            eprintln!("Book creation error: {error}");
+            let template = BookIncludeTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                error_message: Some("Could not save book. Please try again.".to_string()),
+                title: form.title,
+                author: form.author,
+                publication_year: form.publication_year,
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    // Sync to PDS with user's personal data
+    sync_book_to_pds(
+        &db,
+        &user,
+        title,
+        author,
+        publication_year,
+        status,
+        started_at,
+        finished_at,
+    )
+    .await;
+
+    Redirect::to(&format!("/books/{}", book_id)).into_response()
 }

@@ -295,6 +295,14 @@ impl FeedItem {
             .as_ref()
             .map(|s| BookEntryRecord::format_date(s))
     }
+
+    /// Check if this entry is from a different user than the given DID
+    pub fn is_from_other_user(&self, current_did: &Option<String>) -> bool {
+        match current_did {
+            Some(did) => &self.author_did != did,
+            None => true, // If no current_did, always show the button
+        }
+    }
 }
 
 /// Request to delete a record via com.atproto.repo.deleteRecord

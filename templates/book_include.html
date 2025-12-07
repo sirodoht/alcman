@@ -1,0 +1,84 @@
+{% extends "layout.html" %}
+
+{% block title %}add to library{% endblock title %}
+
+{% block content %}
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>add to library</h1>
+            <p>add this book to your personal library</p>
+        </div>
+    </div>
+
+    {% if let Some(error) = error_message %}
+    <div class="page-row">
+        <div class="page-error">{{ error }}</div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/books/include">
+        <input type="hidden" name="title" value="{{ title }}">
+        <input type="hidden" name="author" value="{{ author }}">
+        <input type="hidden" name="publication_year" value="{{ publication_year }}">
+
+        <div class="page-row">
+            <div class="page-content">
+                <span class="page-label">title</span>
+                <span class="page-value">{{ title }}</span>
+            </div>
+        </div>
+
+        {% if !author.is_empty() %}
+        <div class="page-row">
+            <div class="page-content">
+                <span class="page-label">author</span>
+                <span class="page-value">{{ author }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if !publication_year.is_empty() %}
+        <div class="page-row">
+            <div class="page-content">
+                <span class="page-label">year</span>
+                <span class="page-value">{{ publication_year }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="page-row">
+            <div class="page-content">
+                <label for="status">status</label>
+                <select id="status" name="status">
+                    <option value="wantToRead" selected>want to read</option>
+                    <option value="reading">reading</option>
+                    <option value="finished">finished</option>
+                    <option value="dropped">dropped</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="page-row">
+            <div class="page-content">
+                <label for="started_at">started</label>
+                <input type="date" id="started_at" name="started_at">
+            </div>
+        </div>
+
+        <div class="page-row">
+            <div class="page-content">
+                <label for="finished_at">finished</label>
+                <input type="date" id="finished_at" name="finished_at">
+            </div>
+        </div>
+
+        <div class="page-row">
+            <div class="page-content page-actions">
+                <button type="submit">add to library</button>
+                <a href="/feed" class="btn">cancel</a>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock content %}

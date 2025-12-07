@@ -108,12 +108,14 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         .as_ref()
         .map(|u| u.username.clone())
         .unwrap_or_default();
+    let current_did = current.as_ref().and_then(|u| u.did.clone());
 
     let Some(pds_client) = PdsClient::from_env() else {
         let template = GlobalFeedTemplate {
             is_authenticated,
             signups_disabled: signups_disabled(),
             username,
+            current_did,
             feed_items: vec![],
         };
         return Html(template.render().unwrap()).into_response();
@@ -185,6 +187,7 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         is_authenticated,
         signups_disabled: signups_disabled(),
         username,
+        current_did,
         feed_items,
     };
 

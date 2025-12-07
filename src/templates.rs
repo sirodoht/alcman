@@ -110,6 +110,8 @@ pub struct GlobalFeedTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,
+    /// Current user's DID (if authenticated)
+    pub current_did: Option<String>,
     /// Feed items (book entries with author info)
     pub feed_items: Vec<crate::atproto::FeedItem>,
 }
@@ -127,4 +129,19 @@ pub struct BookAddTemplate {
     pub model: String,
     /// The original query that was searched (for display purposes)
     pub query: String,
+}
+
+#[derive(Template)]
+#[template(path = "book_include.html")]
+pub struct BookIncludeTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    pub error_message: Option<String>,
+    /// Book title from the feed
+    pub title: String,
+    /// Book author from the feed
+    pub author: String,
+    /// Book publication year from the feed
+    pub publication_year: String,
 }

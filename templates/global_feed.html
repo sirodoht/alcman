@@ -74,6 +74,9 @@
 
                 <div class="feed-entry-footer">
                     <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
+                    {% if is_authenticated && item.is_from_other_user(current_did) %}
+                    <a href="/books/include?title={{ item.entry.book.title|urlencode }}{% if let Some(authors) = item.entry.book.authors %}&amp;author={{ authors.join(", ")|urlencode }}{% endif %}{% if let Some(year) = item.entry.book.publication_year %}&amp;year={{ year }}{% endif %}" class="feed-entry-add-btn">add to library</a>
+                    {% endif %}
                 </div>
             </div>
         </article>
