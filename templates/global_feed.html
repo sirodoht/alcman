@@ -3,7 +3,7 @@
 {% block title %}global feed{% endblock title %}
 
 {% block content %}
-<section>
+<section class="global-feed">
     <div class="page-row">
         <div class="page-header">
             <h1>global feed</h1>
@@ -14,33 +14,71 @@
     {% if feed_items.is_empty() %}
     <div class="page-row">
         <div class="page-content">
-            <p><em>no posts yet. once users publish books they'll appear here.</em></p>
+            <p class="feed-empty"><em>no posts yet. once users publish books they'll appear here.</em></p>
         </div>
     </div>
     {% else %}
-    {% for item in feed_items %}
-    <div class="feed-entry">
-        <div class="feed-entry-content">
-            <div class="feed-entry-header">
-                {% if let Some(id) = item.book_id %}
-                <h2 class="feed-entry-title">
-                    <a href="/books/{{ id }}">
+    <div class="feed-entries">
+        {% for item in feed_items %}
+        <article class="feed-entry">
+            <div class="feed-entry-content">
+                <div class="feed-entry-header">
+                    {% if let Some(id) = item.book_id %}
+                    <h2 class="feed-entry-title">
+                        <a href="/books/{{ id }}">
                             {{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}
-                    </a>
-                </h2>
-                {% else %}
-                <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
+                        </a>
+                    </h2>
+                    {% else %}
+                    <h2 class="feed-entry-title">{{ item.entry.book.title }}{% if let Some(year) = item.entry.book.publication_year %} <span class="feed-entry-year">({{ year }})</span>{% endif %}</h2>
+                    {% endif %}
+                    {% if let Some(authors) = item.entry.book.authors %}
+                    <p class="feed-entry-author">{{ authors.join(", ") }}</p>
+                    {% endif %}
+                    {% if let Some(isbn) = item.entry.book.isbn %}
+                    <p class="feed-entry-isbn">ISBN: {{ isbn }}</p>
+                    {% endif %}
+                </div>
+
+                {% if let Some(status) = item.entry.status %}
+                <div class="feed-entry-status-section">
+                    {% if status == "reading" %}
+                    <span class="feed-entry-status feed-entry-status-reading">{{ status }}</span>
+                    {% elif status == "finished" %}
+                    <span class="feed-entry-status feed-entry-status-finished">{{ status }}</span>
+                    {% elif status == "wantToRead" %}
+                    <span class="feed-entry-status feed-entry-status-wanttoread">{{ status }}</span>
+                    {% elif status == "dropped" %}
+                    <span class="feed-entry-status feed-entry-status-dropped">{{ status }}</span>
+                    {% else %}
+                    <span class="feed-entry-status">{{ status }}</span>
+                    {% endif %}
+                </div>
                 {% endif %}
-                {% if let Some(authors) = item.entry.book.authors %}
-                <p class="feed-entry-author">{{ authors.join(", ") }}</p>
+
+                {% if let Some(notes) = item.entry.notes %}
+                <div class="feed-entry-notes">
+                    <p>{{ notes }}</p>
+                </div>
                 {% endif %}
+
+                <div class="feed-entry-dates">
+                    {% if let Some(started_at) = item.formatted_started_at() %}
+                    <span class="feed-entry-date">started: {{ started_at }}</span>
+                    {% endif %}
+                    {% if let Some(finished_at) = item.formatted_finished_at() %}
+                    <span class="feed-entry-date">finished: {{ finished_at }}</span>
+                    {% endif %}
+                    <span class="feed-entry-date">{{ item.entry.created_date() }}</span>
+                </div>
+
+                <div class="feed-entry-footer">
+                    <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
+                </div>
             </div>
-            <div class="feed-entry-footer">
-                <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
-            </div>
-        </div>
+        </article>
+        {% endfor %}
     </div>
-    {% endfor %}
     {% endif %}
 
 </section>

@@ -174,6 +174,18 @@ pub struct BookEntryRecord {
     pub record_type: String,
     /// Book metadata
     pub book: BookRef,
+    /// User's notes about the book
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    /// User's reading status
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    /// When the user started reading the book
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<String>,
+    /// When the user finished reading the book
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub finished_at: Option<String>,
     /// When this entry was created
     pub created_at: String,
 }
@@ -184,8 +196,36 @@ impl BookEntryRecord {
         Self {
             record_type: "app.alcman.book.entry".to_string(),
             book,
+            notes: None,
+            status: None,
+            started_at: None,
+            finished_at: None,
             created_at: chrono::Utc::now().to_rfc3339(),
         }
+    }
+
+    /// Format created_at as a human-readable date and time string
+    pub fn created_date(&self) -> String {
+        chrono::DateTime::parse_from_rfc3339(&self.created_at)
+            .map(|dt| dt.format("%B %d, %Y at %I:%M %p").to_string())
+            .unwrap_or_else(|_| {
+                // Fallback: just extract date part if parsing fails
+                self.created_at
+                    .split('T')
+                    .next()
+                    .unwrap_or(&self.created_at)
+                    .to_string()
+            })
+    }
+
+    /// Format a date string (for started_at, finished_at) as human-readable
+    pub fn format_date(date_str: &str) -> String {
+        chrono::DateTime::parse_from_rfc3339(date_str)
+            .map(|dt| dt.format("%B %d, %Y").to_string())
+            .unwrap_or_else(|_| {
+                // Fallback: just extract date part if parsing fails
+                date_str.split('T').next().unwrap_or(date_str).to_string()
+            })
     }
 }
 
@@ -232,6 +272,24 @@ pub struct FeedItem {
     pub author_did: String,
     /// Local database book ID (if available)
     pub book_id: Option<String>,
+}
+
+impl FeedItem {
+    /// Format started_at date if available
+    pub fn formatted_started_at(&self) -> Option<String> {
+        self.entry
+            .started_at
+            .as_ref()
+            .map(|s| BookEntryRecord::format_date(s))
+    }
+
+    /// Format finished_at date if available
+    pub fn formatted_finished_at(&self) -> Option<String> {
+        self.entry
+            .finished_at
+            .as_ref()
+            .map(|s| BookEntryRecord::format_date(s))
+    }
 }
 
 /// Request to delete a record via com.atproto.repo.deleteRecord
