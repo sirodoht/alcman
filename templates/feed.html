@@ -26,14 +26,8 @@
             <span class="page-value">{{ authors.join(", ") }}</span>
             {% endif %}
             <p style="margin-top: 0.5em; font-size: 0.9em;">
-                {% if let Some(status) = item.entry.status %}
-                <span style="color: #666;">{{ status }}</span> &middot;
-                {% endif %}
                 added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a>
             </p>
-            {% if let Some(notes) = item.entry.notes %}
-            <p style="margin-top: 0.5em; color: #666; font-size: 0.9em;">{{ notes }}</p>
-            {% endif %}
         </div>
     </div>
     {% endfor %}

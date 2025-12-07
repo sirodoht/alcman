@@ -22,33 +22,6 @@
     </div>
     {% endif %}
 
-    {% if let Some(status) = book.status %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Status</span>
-            <span class="page-value">{{ status }}</span>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if let Some(started) = book.started_date() %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Started</span>
-            <span class="page-value">{{ started }}</span>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if let Some(finished) = book.finished_date() %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Finished</span>
-            <span class="page-value">{{ finished }}</span>
-        </div>
-    </div>
-    {% endif %}
-
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">Amazon UK</span>
@@ -74,36 +47,14 @@
         </div>
     </div>
 
-    {% if let Some(filepath) = book.filepath %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">File</span>
-            <span class="page-value">{{ filepath }}</span>
-        </div>
-    </div>
-    {% endif %}
-
-    {% if let Some(notes) = book.notes %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label page-noteslabel">Notes</span>
-            <span class="page-value page-notes">{{ notes }}</span>
-        </div>
-    </div>
-    {% endif %}
-
     <div class="page-row">
         <div class="page-content page-actions">
             {% if is_authenticated %}
             <a href="/books/{{ book.id }}/edit" class="btn">edit</a>
-            <a href="/books/{{ book.id }}/edit-notes" class="btn">edit notes</a>
             <a href="/books/{{ book.id }}/edit-chat" class="btn">edit in chat</a>
             <form method="post" action="/books/{{ book.id }}/delete" onsubmit="return confirm('sure?');">
                 <button type="submit" class="btn">delete</button>
             </form>
-            {% endif %}
-            {% if book.filepath.is_some() %}
-            <a href="/books/{{ book.id }}/download" class="btn">download</a>
             {% endif %}
         </div>
     </div>

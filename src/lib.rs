@@ -27,10 +27,9 @@ pub fn create_app(db: AppState) -> Router {
         profile_by_did_page, profile_redirect, signup_page, signup_submit, unfollow_user,
     };
     use books::{
-        book_create, book_delete, book_detail, book_download, book_edit_chat_apply,
-        book_edit_chat_page, book_edit_chat_submit, book_edit_notes_page, book_edit_notes_submit,
-        book_edit_page, book_edit_submit, book_form_page, book_list, quick_add_page,
-        quick_add_submit,
+        book_create, book_delete, book_detail, book_edit_chat_apply, book_edit_chat_page,
+        book_edit_chat_submit, book_edit_page, book_edit_submit, book_form_page, book_list,
+        quick_add_page, quick_add_submit,
     };
     use feed::{feed_page, global_feed_page};
 
@@ -60,15 +59,10 @@ pub fn create_app(db: AppState) -> Router {
             get(book_edit_page).post(book_edit_submit),
         )
         .route(
-            "/books/{id}/edit-notes",
-            get(book_edit_notes_page).post(book_edit_notes_submit),
-        )
-        .route(
             "/books/{id}/edit-chat",
             get(book_edit_chat_page).post(book_edit_chat_submit),
         )
         .route("/books/{id}/edit-chat/apply", post(book_edit_chat_apply))
         .route("/books/{id}/delete", post(book_delete))
-        .route("/books/{id}/download", get(book_download))
         .with_state(db)
 }

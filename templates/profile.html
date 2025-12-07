@@ -69,12 +69,6 @@
             {% if let Some(authors) = entry.value.book.authors %}
             <span class="page-value">{{ authors.join(", ") }}</span>
             {% endif %}
-            {% if let Some(status) = entry.value.status %}
-            <span class="page-value" style="font-style: italic;">{{ status }}</span>
-            {% endif %}
-            {% if let Some(notes) = entry.value.notes %}
-            <p style="margin-top: 0.5em; color: #666; font-size: 0.9em;">{{ notes }}</p>
-            {% endif %}
         </div>
     </div>
     {% endfor %}

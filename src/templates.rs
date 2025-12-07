@@ -10,7 +10,6 @@ pub struct BookListTemplate {
     pub signups_disabled: bool,
     pub username: String,
     pub books: Vec<Book>,
-    pub notes: bool,
 }
 
 #[derive(Template)]
@@ -65,16 +64,6 @@ pub struct BookDetailTemplate {
 #[derive(Template)]
 #[template(path = "book_edit.html")]
 pub struct BookEditTemplate {
-    pub is_authenticated: bool,
-    pub signups_disabled: bool,
-    pub username: String,
-    pub book: Book,
-    pub error_message: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "book_edit_notes.html")]
-pub struct BookEditNotesTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,

@@ -1,21 +1,9 @@
 {% extends "layout.html" %}
 
-{% block title %}book notes{% endblock title %}
+{% block title %}books{% endblock title %}
 
 {% block content %}
 <section>
-    <div class="filters">
-        <div class="filters-content">
-            {% if notes %}
-            <a href="/" class="filters-link">all books</a>
-            <span class="filters-link filters-link-active">notes</span>
-            {% else %}
-            <span class="filters-link filters-link-active">all books</span>
-            <a href="/?notes=true" class="filters-link">notes</a>
-            {% endif %}
-        </div>
-    </div>
-
     {% if books.is_empty() %}
     <section>
         <div style="max-width: 600px; margin: 0 auto;">
@@ -31,16 +19,9 @@
                 <div class="books-list-item-info">
                     <span class="books-list-item-title">
                         {% if book.title.is_empty() %}
-                            {% if let Some(filepath) = book.filepath %}
-                                {{ filepath }}
-                            {% else %}
-                                <em>(untitled)</em>
-                            {% endif %}
+                            <em>(untitled)</em>
                         {% else %}
                             {{ book.title }}
-                        {% endif %}
-                        {% if book.notes.is_some() %}
-                        <span class="books-list-item-notes-icon" title="has notes">*</span>
                         {% endif %}
                     </span>
                     {% if let Some(author) = book.author %}
@@ -48,15 +29,6 @@
                     {% endif %}
                 </div>
                 <div class="books-list-item-meta">
-                    {% if let Some(status) = book.status %}
-                    <span class="books-list-item-status">{{ status }}</span>
-                    {% endif %}
-                    {% if let Some(started) = book.started_date() %}
-                    <span class="books-list-item-started">started {{ started }}</span>
-                    {% endif %}
-                    {% if let Some(finished) = book.finished_date() %}
-                    <span class="books-list-item-finished">finished {{ finished }}</span>
-                    {% endif %}
                     {% if let Some(year) = book.publication_year %}
                     <span class="books-list-item-year">{{ year }}</span>
                     {% endif %}

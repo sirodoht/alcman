@@ -1,11 +1,10 @@
 use askama::Template;
 use axum::{
     extract::{Form, Path, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
 };
 use serde::{Deserialize, Serialize};
-use std::env;
 
 use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
@@ -14,12 +13,9 @@ use crate::database::{BookUpdate, Database, NewBook};
 use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
-    BookDetailTemplate, BookEditChatTemplate, BookEditNotesTemplate, BookEditTemplate,
-    BookFormTemplate, BookListTemplate, QuickAddTemplate,
+    BookDetailTemplate, BookEditChatTemplate, BookEditTemplate, BookFormTemplate, BookListTemplate,
+    QuickAddTemplate,
 };
-
-// Valid book status values
-pub const BOOK_STATUSES: [&str; 4] = ["reading", "finished", "want-to-read", "dropped"];
 
 // Book-related structures
 #[derive(sqlx::FromRow, Serialize, Clone)]
@@ -28,11 +24,6 @@ pub struct Book {
     pub title: String,
     pub author: Option<String>,
     pub publication_year: Option<i32>,
-    pub filepath: Option<String>,
-    pub notes: Option<String>,
-    pub status: Option<String>,
-    pub started_at: Option<String>,
-    pub finished_at: Option<String>,
     pub created_at: String,
 }
 
@@ -43,18 +34,6 @@ impl Book {
             .next()
             .unwrap_or(&self.created_at)
     }
-
-    pub fn started_date(&self) -> Option<&str> {
-        self.started_at
-            .as_ref()
-            .map(|s| s.split('T').next().unwrap_or(s.as_str()))
-    }
-
-    pub fn finished_date(&self) -> Option<&str> {
-        self.finished_at
-            .as_ref()
-            .map(|s| s.split('T').next().unwrap_or(s.as_str()))
-    }
 }
 
 #[derive(Deserialize)]
@@ -62,10 +41,6 @@ pub struct CreateBookForm {
     pub title: String,
     pub author: String,
     pub publication_year: String,
-    pub status: String,
-    pub started_at: String,
-    pub finished_at: String,
-    pub notes: String,
 }
 
 #[derive(Deserialize)]
@@ -79,14 +54,6 @@ pub struct EditBookForm {
     pub title: String,
     pub author: String,
     pub publication_year: String,
-    pub status: String,
-    pub started_at: String,
-    pub finished_at: String,
-}
-
-#[derive(Deserialize)]
-pub struct EditNotesForm {
-    pub notes: String,
 }
 
 #[derive(Deserialize)]
@@ -102,35 +69,15 @@ pub struct EditChatApplyForm {
     pub publication_year: String,
 }
 
-#[derive(Deserialize)]
-pub struct BookListQuery {
-    pub notes: Option<String>,
-}
-
-pub async fn book_list(
-    State(db): State<AppState>,
-    headers: HeaderMap,
-    axum::extract::Query(query): axum::extract::Query<BookListQuery>,
-) -> impl IntoResponse {
+pub async fn book_list(State(db): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
     let user = current_user(&db, &headers).await;
-    let all_books = db.get_all_books().await.unwrap_or_default();
-
-    let notes = query.notes.as_deref() == Some("true");
-    let books = if notes {
-        all_books
-            .into_iter()
-            .filter(|b| b.notes.is_some())
-            .collect()
-    } else {
-        all_books
-    };
+    let books = db.get_all_books().await.unwrap_or_default();
 
     let template = BookListTemplate {
         is_authenticated: user.is_some(),
         signups_disabled: signups_disabled(),
         username: user.map(|u| u.username).unwrap_or_default(),
         books,
-        notes,
     };
 
     Html(template.render().unwrap())
@@ -183,53 +130,16 @@ pub async fn book_create(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    let status = if form.status.trim().is_empty() || !BOOK_STATUSES.contains(&form.status.trim()) {
-        None
-    } else {
-        Some(form.status.trim())
-    };
-
-    let notes = if form.notes.trim().is_empty() {
-        None
-    } else {
-        Some(form.notes.trim())
-    };
-
-    let started_at = if form.started_at.trim().is_empty() {
-        None
-    } else {
-        Some(form.started_at.trim())
-    };
-
-    let finished_at = if form.finished_at.trim().is_empty() {
-        None
-    } else {
-        Some(form.finished_at.trim())
-    };
-
     let new_book = NewBook {
         title,
         author,
         publication_year,
-        status,
-        started_at,
-        finished_at,
-        notes,
     };
 
     match db.create_book(new_book).await {
         Ok(_) => {
             // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(
-                &db,
-                &user,
-                title,
-                author,
-                publication_year,
-                status.map(String::from),
-                notes.map(String::from),
-            )
-            .await;
+            sync_book_to_pds(&db, &user, title, author, publication_year).await;
             Redirect::to("/").into_response()
         }
         Err(error) => {
@@ -253,8 +163,6 @@ async fn sync_book_to_pds(
     title: &str,
     author: Option<&str>,
     publication_year: Option<i32>,
-    status: Option<String>,
-    notes: Option<String>,
 ) {
     let Some(pds_client) = PdsClient::from_env() else {
         // PDS not configured
@@ -275,7 +183,7 @@ async fn sync_book_to_pds(
     };
 
     // Create book entry on PDS
-    match auth_pds.create_book_entry(book_ref, status, notes).await {
+    match auth_pds.create_book_entry(book_ref).await {
         Ok(response) => {
             println!("Synced book to PDS: {} (uri: {})", title, response.uri);
         }
@@ -329,66 +237,6 @@ pub async fn book_delete(
             (StatusCode::INTERNAL_SERVER_ERROR, "Could not delete book").into_response()
         }
     }
-}
-
-pub async fn book_download(State(db): State<AppState>, Path(book_id): Path<String>) -> Response {
-    let book = match db.get_book_by_id(&book_id).await {
-        Ok(Some(book)) => book,
-        Ok(None) => {
-            return (StatusCode::NOT_FOUND, "Book not found").into_response();
-        }
-        Err(error) => {
-            eprintln!("Error fetching book: {error}");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error").into_response();
-        }
-    };
-
-    let Some(filepath) = &book.filepath else {
-        return (StatusCode::NOT_FOUND, "No file associated with this book").into_response();
-    };
-
-    // Get library path from environment, default to current directory
-    let library_path = env::var("LIBRARY_PATH").unwrap_or_else(|_| ".".to_string());
-    let full_path = std::path::Path::new(&library_path).join(filepath);
-
-    if !full_path.exists() {
-        eprintln!("File not found: {}", full_path.display());
-        return (StatusCode::NOT_FOUND, "File not found on disk").into_response();
-    }
-
-    let file_contents = match std::fs::read(&full_path) {
-        Ok(contents) => contents,
-        Err(error) => {
-            eprintln!("Error reading file: {error}");
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Could not read file").into_response();
-        }
-    };
-
-    // Determine content type based on extension
-    let content_type = match full_path.extension().and_then(|e| e.to_str()) {
-        Some("pdf") => "application/pdf",
-        Some("epub") => "application/epub+zip",
-        Some("mobi") => "application/x-mobipocket-ebook",
-        Some("txt") => "text/plain",
-        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        _ => "application/octet-stream",
-    };
-
-    // Get filename for Content-Disposition header
-    let filename = full_path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("download");
-
-    let headers = [
-        (header::CONTENT_TYPE, content_type),
-        (
-            header::CONTENT_DISPOSITION,
-            &format!("attachment; filename=\"{}\"", filename),
-        ),
-    ];
-
-    (headers, file_contents).into_response()
 }
 
 pub async fn quick_add_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
@@ -457,28 +305,22 @@ pub async fn quick_add_submit(
         }
     };
 
-    // Create the book with extracted metadata (default status: want-to-read)
+    // Create the book with extracted metadata
     let new_book = NewBook {
         title: &metadata.title,
         author: metadata.author.as_deref(),
         publication_year: metadata.publication_year,
-        status: Some("want-to-read"),
-        started_at: None,  // started_at
-        finished_at: None, // finished_at
-        notes: None,       // notes
     };
 
     match db.create_book(new_book).await {
         Ok(book_id) => {
-            // Sync book to PDS (don't fail if this errors) - default to want-to-read for quick add
+            // Sync book to PDS (don't fail if this errors)
             sync_book_to_pds(
                 &db,
                 &user,
                 &metadata.title,
                 metadata.author.as_deref(),
                 metadata.publication_year,
-                Some("want-to-read".to_string()),
-                None,
             )
             .await;
             Redirect::to(&format!("/books/{}", book_id)).into_response()
@@ -561,31 +403,10 @@ pub async fn book_edit_submit(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    let status = if form.status.trim().is_empty() || !BOOK_STATUSES.contains(&form.status.trim()) {
-        None
-    } else {
-        Some(form.status.trim())
-    };
-
-    let started_at = if form.started_at.trim().is_empty() {
-        None
-    } else {
-        Some(form.started_at.trim())
-    };
-
-    let finished_at = if form.finished_at.trim().is_empty() {
-        None
-    } else {
-        Some(form.finished_at.trim())
-    };
-
     let update = BookUpdate {
         title,
         author,
         publication_year,
-        status,
-        started_at,
-        finished_at,
     };
 
     match db.update_book(&book_id, update).await {
@@ -598,8 +419,6 @@ pub async fn book_edit_submit(
                     &book.title,
                     book.author.as_deref(),
                     book.publication_year,
-                    book.status,
-                    book.notes,
                 )
                 .await;
             }
@@ -618,78 +437,6 @@ pub async fn book_edit_submit(
                 return Html(template.render().unwrap()).into_response();
             }
             Redirect::to("/").into_response()
-        }
-    }
-}
-
-pub async fn book_edit_notes_page(
-    State(db): State<AppState>,
-    headers: HeaderMap,
-    Path(book_id): Path<String>,
-) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    if user.is_none() {
-        return Redirect::to("/login").into_response();
-    }
-
-    match db.get_book_by_id(&book_id).await {
-        Ok(Some(book)) => {
-            let template = BookEditNotesTemplate {
-                is_authenticated: true,
-                signups_disabled: signups_disabled(),
-                username: user.map(|u| u.username).unwrap_or_default(),
-                book,
-                error_message: None,
-            };
-            Html(template.render().unwrap()).into_response()
-        }
-        Ok(None) => Redirect::to("/").into_response(),
-        Err(error) => {
-            eprintln!("Error fetching book: {error}");
-            Redirect::to("/").into_response()
-        }
-    }
-}
-
-pub async fn book_edit_notes_submit(
-    State(db): State<AppState>,
-    headers: HeaderMap,
-    Path(book_id): Path<String>,
-    Form(form): Form<EditNotesForm>,
-) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    let Some(user) = user else {
-        return Redirect::to("/login").into_response();
-    };
-
-    let notes = if form.notes.trim().is_empty() {
-        None
-    } else {
-        Some(form.notes.trim())
-    };
-
-    match db.update_book_notes(&book_id, notes).await {
-        Ok(_) => {
-            // Fetch the book to get full details for PDS sync
-            if let Ok(Some(book)) = db.get_book_by_id(&book_id).await {
-                sync_book_to_pds(
-                    &db,
-                    &user,
-                    &book.title,
-                    book.author.as_deref(),
-                    book.publication_year,
-                    book.status,
-                    book.notes,
-                )
-                .await;
-            }
-            Redirect::to(&format!("/books/{}", book_id)).into_response()
-        }
-        Err(error) => {
-            eprintln!("Notes update error: {error}");
-            Redirect::to(&format!("/books/{}", book_id)).into_response()
         }
     }
 }
@@ -835,19 +582,10 @@ pub async fn book_edit_chat_apply(
 
     let publication_year = form.publication_year.trim().parse::<i32>().ok();
 
-    // Get existing book to preserve status and dates
-    let existing_book = db.get_book_by_id(&book_id).await.ok().flatten();
-    let existing_status = existing_book.as_ref().and_then(|b| b.status.clone());
-    let existing_started_at = existing_book.as_ref().and_then(|b| b.started_at.clone());
-    let existing_finished_at = existing_book.as_ref().and_then(|b| b.finished_at.clone());
-
     let update = BookUpdate {
         title,
         author,
         publication_year,
-        status: existing_status.as_deref(),
-        started_at: existing_started_at.as_deref(),
-        finished_at: existing_finished_at.as_deref(),
     };
 
     match db.update_book(&book_id, update).await {

@@ -15,10 +15,6 @@ pub struct NewBook<'a> {
     pub title: &'a str,
     pub author: Option<&'a str>,
     pub publication_year: Option<i32>,
-    pub status: Option<&'a str>,
-    pub started_at: Option<&'a str>,
-    pub finished_at: Option<&'a str>,
-    pub notes: Option<&'a str>,
 }
 
 /// Input payload for updating a book.
@@ -26,9 +22,6 @@ pub struct BookUpdate<'a> {
     pub title: &'a str,
     pub author: Option<&'a str>,
     pub publication_year: Option<i32>,
-    pub status: Option<&'a str>,
-    pub started_at: Option<&'a str>,
-    pub finished_at: Option<&'a str>,
 }
 
 impl Database {
@@ -387,25 +380,17 @@ impl Database {
             title,
             author,
             publication_year,
-            status,
-            started_at,
-            finished_at,
-            notes,
         } = new_book;
         let book_id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
 
         sqlx::query(
-            "INSERT INTO books (id, title, author, publication_year, status, started_at, finished_at, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO books (id, title, author, publication_year, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(&book_id)
         .bind(title)
         .bind(author)
         .bind(publication_year)
-        .bind(status)
-        .bind(started_at)
-        .bind(finished_at)
-        .bind(notes)
         .bind(&now)
         .bind(&now)
         .execute(&self.pool)
@@ -414,62 +399,9 @@ impl Database {
         Ok(book_id)
     }
 
-    /// Create or update a book by filepath (upsert).
-    /// If a book with the given filepath exists, it will be updated.
-    /// Otherwise, a new book will be created.
-    pub async fn upsert_book_by_filepath(
-        &self,
-        filepath: &str,
-        title: &str,
-        author: Option<&str>,
-        publication_year: Option<i32>,
-    ) -> Result<String, DynError> {
-        let now = chrono::Utc::now().to_rfc3339();
-
-        // Check if book with this filepath already exists
-        let existing = sqlx::query("SELECT id FROM books WHERE filepath = ?")
-            .bind(filepath)
-            .fetch_optional(&self.pool)
-            .await?;
-
-        if let Some(row) = existing {
-            // Update existing book
-            let book_id: String = row.get("id");
-            sqlx::query(
-                "UPDATE books SET title = ?, author = ?, publication_year = ?, updated_at = ? WHERE id = ?",
-            )
-            .bind(title)
-            .bind(author)
-            .bind(publication_year)
-            .bind(&now)
-            .bind(&book_id)
-            .execute(&self.pool)
-            .await?;
-
-            Ok(book_id)
-        } else {
-            // Create new book
-            let book_id = uuid::Uuid::new_v4().to_string();
-            sqlx::query(
-                "INSERT INTO books (id, title, author, publication_year, filepath, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(&book_id)
-            .bind(title)
-            .bind(author)
-            .bind(publication_year)
-            .bind(filepath)
-            .bind(&now)
-            .bind(&now)
-            .execute(&self.pool)
-            .await?;
-
-            Ok(book_id)
-        }
-    }
-
     pub async fn get_all_books(&self) -> Result<Vec<crate::books::Book>, sqlx::Error> {
         let rows = sqlx::query(
-            "SELECT id, title, author, publication_year, filepath, notes, status, started_at, finished_at, created_at FROM books ORDER BY created_at DESC",
+            "SELECT id, title, author, publication_year, created_at FROM books ORDER BY created_at DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -481,11 +413,6 @@ impl Database {
                 title: row.get("title"),
                 author: row.get("author"),
                 publication_year: row.get("publication_year"),
-                filepath: row.get("filepath"),
-                notes: row.get("notes"),
-                status: row.get("status"),
-                started_at: row.get("started_at"),
-                finished_at: row.get("finished_at"),
                 created_at: row.get("created_at"),
             })
             .collect();
@@ -498,7 +425,7 @@ impl Database {
         book_id: &str,
     ) -> Result<Option<crate::books::Book>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, title, author, publication_year, filepath, notes, status, started_at, finished_at, created_at FROM books WHERE id = ?",
+            "SELECT id, title, author, publication_year, created_at FROM books WHERE id = ?",
         )
         .bind(book_id)
         .fetch_optional(&self.pool)
@@ -509,11 +436,6 @@ impl Database {
             title: row.get("title"),
             author: row.get("author"),
             publication_year: row.get("publication_year"),
-            filepath: row.get("filepath"),
-            notes: row.get("notes"),
-            status: row.get("status"),
-            started_at: row.get("started_at"),
-            finished_at: row.get("finished_at"),
             created_at: row.get("created_at"),
         }))
     }
@@ -542,39 +464,18 @@ impl Database {
             title,
             author,
             publication_year,
-            status,
-            started_at,
-            finished_at,
         } = update;
         let now = chrono::Utc::now().to_rfc3339();
         sqlx::query(
-            "UPDATE books SET title = ?, author = ?, publication_year = ?, status = ?, started_at = ?, finished_at = ?, updated_at = ? WHERE id = ?",
+            "UPDATE books SET title = ?, author = ?, publication_year = ?, updated_at = ? WHERE id = ?",
         )
         .bind(title)
         .bind(author)
         .bind(publication_year)
-        .bind(status)
-        .bind(started_at)
-        .bind(finished_at)
         .bind(&now)
         .bind(book_id)
         .execute(&self.pool)
         .await?;
-        Ok(())
-    }
-
-    pub async fn update_book_notes(
-        &self,
-        book_id: &str,
-        notes: Option<&str>,
-    ) -> Result<(), sqlx::Error> {
-        let now = chrono::Utc::now().to_rfc3339();
-        sqlx::query("UPDATE books SET notes = ?, updated_at = ? WHERE id = ?")
-            .bind(notes)
-            .bind(&now)
-            .bind(book_id)
-            .execute(&self.pool)
-            .await?;
         Ok(())
     }
 }

@@ -27,15 +27,7 @@
                 <p class="feed-entry-author">{{ authors.join(", ") }}</p>
                 {% endif %}
             </div>
-            {% if let Some(notes) = item.entry.notes %}
-            <div class="feed-entry-notes">
-                <p>{{ notes }}</p>
-            </div>
-            {% endif %}
             <div class="feed-entry-footer">
-                {% if let Some(status) = item.entry.status %}
-                <span class="feed-entry-status">{{ status }}</span>
-                {% endif %}
                 <span class="feed-entry-meta">added by <a href="/profile/{{ item.author_did }}">{{ item.author_username }}</a></span>
             </div>
         </div>

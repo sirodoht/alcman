@@ -134,32 +134,16 @@ pub struct BookEntryRecord {
     pub record_type: String,
     /// Book metadata
     pub book: BookRef,
-    /// User's notes about the book
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub notes: Option<String>,
-    /// Reading status
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    /// When the user started reading
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started_at: Option<String>,
-    /// When the user finished reading
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished_at: Option<String>,
     /// When this entry was created
     pub created_at: String,
 }
 
 impl BookEntryRecord {
     /// Create a new book entry record
-    pub fn new(book: BookRef, status: Option<String>, notes: Option<String>) -> Self {
+    pub fn new(book: BookRef) -> Self {
         Self {
             record_type: "app.alcman.book.entry".to_string(),
             book,
-            notes,
-            status,
-            started_at: None,
-            finished_at: None,
             created_at: chrono::Utc::now().to_rfc3339(),
         }
     }
@@ -500,10 +484,8 @@ impl PdsClient {
         access_jwt: &str,
         did: &str,
         book: BookRef,
-        status: Option<String>,
-        notes: Option<String>,
     ) -> AtprotoResult<CreateRecordResponse> {
-        let record = BookEntryRecord::new(book, status, notes);
+        let record = BookEntryRecord::new(book);
         self.create_record(access_jwt, did, "app.alcman.book.entry", record)
             .await
     }
