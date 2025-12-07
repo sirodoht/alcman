@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+
+{% block title %}add book{% endblock title %}
+
+{% block content %}
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>add book</h1>
+            {% if extracted_metadata.is_none() %}
+            <p>enter what you know and the robots will fill in the rest</p>
+            {% else %}
+            <p>review and edit, or save</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if let Some(error) = error_message %}
+    <div class="page-row">
+        <div class="page-error">{{ error }}</div>
+    </div>
+    {% endif %}
+
+    {% if let Some(metadata) = extracted_metadata %}
+    {# Review state: show editable form with extracted metadata #}
+
+    {% if !query.is_empty() %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">searched for</span>
+            <span class="page-value">{{ query }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/books/add/save">
+        <input type="hidden" name="model" value="{{ model }}">
+        <input type="hidden" name="query" value="{{ query }}">
+        <div class="page-row">
+            <div class="page-content">
+                <label for="title">title</label>
+                <input type="text" id="title" name="title" required value="{{ metadata.title }}">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content">
+                <label for="author">author</label>
+                <input type="text" id="author" name="author" value="{% if let Some(author) = metadata.author %}{{ author }}{% endif %}">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content">
+                <label for="publication_year">pub year</label>
+                <input type="number" id="publication_year" name="publication_year" min="1000" max="2100" value="{% if let Some(year) = metadata.publication_year %}{{ year }}{% endif %}">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content page-actions">
+                <button type="submit">save</button>
+                <a href="/books/add" class="btn">start over</a>
+            </div>
+        </div>
+    </form>
+
+    <div class="page-row">
+        <div class="page-header">
+            <h2>refine with robot</h2>
+        </div>
+    </div>
+
+    <form method="post" action="/books/add/refine">
+        <input type="hidden" name="title" value="{{ metadata.title }}">
+        <input type="hidden" name="author" value="{% if let Some(author) = metadata.author %}{{ author }}{% endif %}">
+        <input type="hidden" name="publication_year" value="{% if let Some(year) = metadata.publication_year %}{{ year }}{% endif %}">
+        <input type="hidden" name="query" value="{{ query }}">
+        <div class="page-row">
+            <div class="page-content">
+                <label for="instruction">instruction</label>
+                <input type="text" id="instruction" name="instruction" placeholder="e.g. use german title, fix author name...">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content">
+                <label for="refine_model">robot</label>
+                <select id="refine_model" name="model">
+                    <option value="gpt-5.1" {% if model == "gpt-5.1" %}selected{% endif %}>gpt-5.1</option>
+                    <option value="gpt-5-nano" {% if model == "gpt-5-nano" %}selected{% endif %}>gpt-5-nano</option>
+                    <option value="gpt-5-mini" {% if model == "gpt-5-mini" %}selected{% endif %}>gpt-5-mini</option>
+                </select>
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content page-actions">
+                <button type="submit">refine</button>
+            </div>
+        </div>
+    </form>
+
+    {% else %}
+    {# Initial state: show quick add form #}
+    <form method="post" action="/books/add/extract">
+        <div class="page-row">
+            <div class="page-content">
+                <label for="query">book</label>
+                <input type="text" id="query" name="query" required placeholder="e.g. 1984 orwell">
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content">
+                <label for="model">robot</label>
+                <select id="model" name="model">
+                    <option value="gpt-5.1">gpt-5.1</option>
+                    <option value="gpt-5-nano">gpt-5-nano</option>
+                    <option value="gpt-5-mini">gpt-5-mini</option>
+                </select>
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content page-actions">
+                <button type="submit">find</button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+</section>
+{% endblock content %}

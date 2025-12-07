@@ -10,11 +10,11 @@ use crate::AppState;
 use crate::atproto::{BookRef, PdsClient};
 use crate::auth::{User, current_user, signups_disabled};
 use crate::database::{BookUpdate, Database, NewBook};
+use crate::gpt::BookMetadata;
 use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
-    BookDetailTemplate, BookEditChatTemplate, BookEditTemplate, BookFormTemplate, BookListTemplate,
-    QuickAddTemplate,
+    BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate, BookListTemplate,
 };
 
 // Book-related structures
@@ -37,19 +37,6 @@ impl Book {
 }
 
 #[derive(Deserialize)]
-pub struct CreateBookForm {
-    pub title: String,
-    pub author: String,
-    pub publication_year: String,
-}
-
-#[derive(Deserialize)]
-pub struct QuickAddForm {
-    pub query: String,
-    pub model: String,
-}
-
-#[derive(Deserialize)]
 pub struct EditBookForm {
     pub title: String,
     pub author: String,
@@ -69,6 +56,31 @@ pub struct EditChatApplyForm {
     pub publication_year: String,
 }
 
+#[derive(Deserialize)]
+pub struct BookAddExtractForm {
+    pub query: String,
+    pub model: String,
+}
+
+#[derive(Deserialize)]
+pub struct BookAddRefineForm {
+    pub title: String,
+    pub author: String,
+    pub publication_year: String,
+    pub instruction: String,
+    pub model: String,
+    pub query: String,
+}
+
+#[derive(Deserialize)]
+pub struct BookAddSaveForm {
+    pub title: String,
+    pub author: String,
+    pub publication_year: String,
+    pub model: String,
+    pub query: String,
+}
+
 pub async fn book_list(State(db): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
     let user = current_user(&db, &headers).await;
     let books = db.get_all_books().await.unwrap_or_default();
@@ -81,78 +93,6 @@ pub async fn book_list(State(db): State<AppState>, headers: HeaderMap) -> impl I
     };
 
     Html(template.render().unwrap())
-}
-
-pub async fn book_form_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    if user.is_none() {
-        return Redirect::to("/login").into_response();
-    }
-
-    let template = BookFormTemplate {
-        is_authenticated: true,
-        signups_disabled: signups_disabled(),
-        username: user.map(|u| u.username).unwrap_or_default(),
-        error_message: None,
-    };
-
-    Html(template.render().unwrap()).into_response()
-}
-
-pub async fn book_create(
-    State(db): State<AppState>,
-    headers: HeaderMap,
-    Form(form): Form<CreateBookForm>,
-) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    let Some(user) = user else {
-        return Redirect::to("/login").into_response();
-    };
-
-    let title = form.title.trim();
-    if title.is_empty() {
-        let template = BookFormTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            error_message: Some("Title is required".to_string()),
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
-    let author = if form.author.trim().is_empty() {
-        None
-    } else {
-        Some(form.author.trim())
-    };
-
-    let publication_year = form.publication_year.trim().parse::<i32>().ok();
-
-    let new_book = NewBook {
-        title,
-        author,
-        publication_year,
-    };
-
-    match db.create_book(new_book).await {
-        Ok(_) => {
-            // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(&db, &user, title, author, publication_year).await;
-            Redirect::to("/").into_response()
-        }
-        Err(error) => {
-            eprintln!("Book creation error: {error}");
-            let template = BookFormTemplate {
-                is_authenticated: true,
-                signups_disabled: signups_disabled(),
-                username: user.username.clone(),
-                error_message: Some("Could not create book. Please try again.".to_string()),
-            };
-            Html(template.render().unwrap()).into_response()
-        }
-    }
 }
 
 /// Sync a book entry to the user's AT Protocol PDS.
@@ -235,105 +175,6 @@ pub async fn book_delete(
         Err(error) => {
             eprintln!("Error deleting book: {error}");
             (StatusCode::INTERNAL_SERVER_ERROR, "Could not delete book").into_response()
-        }
-    }
-}
-
-pub async fn quick_add_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    if user.is_none() {
-        return Redirect::to("/login").into_response();
-    }
-
-    let template = QuickAddTemplate {
-        is_authenticated: true,
-        signups_disabled: signups_disabled(),
-        username: user.map(|u| u.username).unwrap_or_default(),
-        error_message: None,
-    };
-
-    Html(template.render().unwrap()).into_response()
-}
-
-pub async fn quick_add_submit(
-    State(db): State<AppState>,
-    headers: HeaderMap,
-    Form(form): Form<QuickAddForm>,
-) -> Response {
-    let user = current_user(&db, &headers).await;
-
-    let Some(user) = user else {
-        return Redirect::to("/login").into_response();
-    };
-
-    let query = form.query.trim();
-    if query.is_empty() {
-        let template = QuickAddTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            error_message: Some("Please enter a book".to_string()),
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
-    // Create GPT client and extract metadata
-    let gpt = GptClient::new(GptConfig::from_env());
-
-    if !gpt.has_api_key() {
-        let template = QuickAddTemplate {
-            is_authenticated: true,
-            signups_disabled: signups_disabled(),
-            username: user.username,
-            error_message: Some("AI features not available (API key not configured)".to_string()),
-        };
-        return Html(template.render().unwrap()).into_response();
-    }
-
-    let metadata = match gpt.extract_book_metadata(query, &form.model).await {
-        Ok(m) => m,
-        Err(error) => {
-            eprintln!("GPT error: {error}");
-            let template = QuickAddTemplate {
-                is_authenticated: true,
-                signups_disabled: signups_disabled(),
-                username: user.username,
-                error_message: Some(format!("Could not identify book: {error}")),
-            };
-            return Html(template.render().unwrap()).into_response();
-        }
-    };
-
-    // Create the book with extracted metadata
-    let new_book = NewBook {
-        title: &metadata.title,
-        author: metadata.author.as_deref(),
-        publication_year: metadata.publication_year,
-    };
-
-    match db.create_book(new_book).await {
-        Ok(book_id) => {
-            // Sync book to PDS (don't fail if this errors)
-            sync_book_to_pds(
-                &db,
-                &user,
-                &metadata.title,
-                metadata.author.as_deref(),
-                metadata.publication_year,
-            )
-            .await;
-            Redirect::to(&format!("/books/{}", book_id)).into_response()
-        }
-        Err(error) => {
-            eprintln!("Book creation error: {error}");
-            let template = QuickAddTemplate {
-                is_authenticated: true,
-                signups_disabled: signups_disabled(),
-                username: user.username.clone(),
-                error_message: Some("Could not save book. Please try again.".to_string()),
-            };
-            Html(template.render().unwrap()).into_response()
         }
     }
 }
@@ -593,6 +434,281 @@ pub async fn book_edit_chat_apply(
         Err(error) => {
             eprintln!("Book update error: {error}");
             Redirect::to(&format!("/books/{}/edit-chat", book_id)).into_response()
+        }
+    }
+}
+
+// Combined add book page handlers
+
+pub async fn book_add_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    if user.is_none() {
+        return Redirect::to("/login").into_response();
+    }
+
+    let template = BookAddTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.map(|u| u.username).unwrap_or_default(),
+        error_message: None,
+        extracted_metadata: None,
+        model: "gpt-5.1".to_string(),
+        query: String::new(),
+    };
+
+    Html(template.render().unwrap()).into_response()
+}
+
+pub async fn book_add_extract(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<BookAddExtractForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let query = form.query.trim();
+    if query.is_empty() {
+        let template = BookAddTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Please enter a book".to_string()),
+            extracted_metadata: None,
+            model: form.model.clone(),
+            query: String::new(),
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    // Create GPT client and extract metadata
+    let gpt = GptClient::new(GptConfig::from_env());
+
+    if !gpt.has_api_key() {
+        let template = BookAddTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("AI features not available (API key not configured)".to_string()),
+            extracted_metadata: None,
+            model: form.model.clone(),
+            query: query.to_string(),
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    let metadata = match gpt.extract_book_metadata(query, &form.model).await {
+        Ok(m) => m,
+        Err(error) => {
+            eprintln!("GPT error: {error}");
+            let template = BookAddTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                error_message: Some(format!("Could not identify book: {error}")),
+                extracted_metadata: None,
+                model: form.model.clone(),
+                query: query.to_string(),
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    let template = BookAddTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.username,
+        error_message: None,
+        extracted_metadata: Some(metadata),
+        model: form.model,
+        query: query.to_string(),
+    };
+    Html(template.render().unwrap()).into_response()
+}
+
+pub async fn book_add_refine(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<BookAddRefineForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let instruction = form.instruction.trim();
+    if instruction.is_empty() {
+        // No instruction given, just return to the same state
+        let metadata = BookMetadata {
+            title: form.title.clone(),
+            author: if form.author.trim().is_empty() {
+                None
+            } else {
+                Some(form.author.clone())
+            },
+            publication_year: form.publication_year.trim().parse::<i32>().ok(),
+        };
+        let template = BookAddTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Please enter an instruction".to_string()),
+            extracted_metadata: Some(metadata),
+            model: form.model,
+            query: form.query,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    // Create GPT client and process the instruction
+    let gpt = GptClient::new(GptConfig::from_env());
+
+    if !gpt.has_api_key() {
+        let metadata = BookMetadata {
+            title: form.title.clone(),
+            author: if form.author.trim().is_empty() {
+                None
+            } else {
+                Some(form.author.clone())
+            },
+            publication_year: form.publication_year.trim().parse::<i32>().ok(),
+        };
+        let template = BookAddTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("AI features not available (API key not configured)".to_string()),
+            extracted_metadata: Some(metadata),
+            model: form.model,
+            query: form.query,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    let current_author = if form.author.trim().is_empty() {
+        None
+    } else {
+        Some(form.author.trim())
+    };
+    let current_publication_year = form.publication_year.trim().parse::<i32>().ok();
+
+    let edit_result = match gpt
+        .edit_book_with_instruction(
+            &form.title,
+            current_author,
+            current_publication_year,
+            instruction,
+            &form.model,
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(error) => {
+            eprintln!("GPT error: {error}");
+            let metadata = BookMetadata {
+                title: form.title.clone(),
+                author: current_author.map(|s| s.to_string()),
+                publication_year: current_publication_year,
+            };
+            let template = BookAddTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                error_message: Some(format!("AI error: {error}")),
+                extracted_metadata: Some(metadata),
+                model: form.model,
+                query: form.query,
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    // Convert BookEditResult to BookMetadata for the template
+    let metadata = BookMetadata {
+        title: edit_result.title,
+        author: edit_result.author,
+        publication_year: edit_result.publication_year,
+    };
+
+    let template = BookAddTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.username,
+        error_message: None,
+        extracted_metadata: Some(metadata),
+        model: form.model,
+        query: form.query,
+    };
+    Html(template.render().unwrap()).into_response()
+}
+
+pub async fn book_add_save(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<BookAddSaveForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let title = form.title.trim();
+    if title.is_empty() {
+        let template = BookAddTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Title is required".to_string()),
+            extracted_metadata: None,
+            model: form.model,
+            query: form.query,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    let author = if form.author.trim().is_empty() {
+        None
+    } else {
+        Some(form.author.trim())
+    };
+
+    let publication_year = form.publication_year.trim().parse::<i32>().ok();
+
+    let new_book = NewBook {
+        title,
+        author,
+        publication_year,
+    };
+
+    match db.create_book(new_book).await {
+        Ok(book_id) => {
+            // Sync book to PDS (don't fail if this errors)
+            sync_book_to_pds(&db, &user, title, author, publication_year).await;
+            Redirect::to(&format!("/books/{}", book_id)).into_response()
+        }
+        Err(error) => {
+            eprintln!("Book creation error: {error}");
+            let metadata = BookMetadata {
+                title: form.title.clone(),
+                author: author.map(|s| s.to_string()),
+                publication_year,
+            };
+            let template = BookAddTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username.clone(),
+                error_message: Some("Could not save book. Please try again.".to_string()),
+                extracted_metadata: Some(metadata),
+                model: form.model,
+                query: form.query,
+            };
+            Html(template.render().unwrap()).into_response()
         }
     }
 }

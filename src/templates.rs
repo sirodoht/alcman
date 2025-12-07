@@ -1,7 +1,7 @@
 use askama::Template;
 
 use crate::books::Book;
-use crate::gpt::BookEditResult;
+use crate::gpt::{BookEditResult, BookMetadata};
 
 #[derive(Template)]
 #[template(path = "book_list.html")]
@@ -31,24 +31,6 @@ pub struct SignupTemplate {
     pub form_username: String,
     pub form_email: String,
     pub form_invite_code: String,
-    pub error_message: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "book_form.html")]
-pub struct BookFormTemplate {
-    pub is_authenticated: bool,
-    pub signups_disabled: bool,
-    pub username: String,
-    pub error_message: Option<String>,
-}
-
-#[derive(Template)]
-#[template(path = "book_quick_add.html")]
-pub struct QuickAddTemplate {
-    pub is_authenticated: bool,
-    pub signups_disabled: bool,
-    pub username: String,
     pub error_message: Option<String>,
 }
 
@@ -129,4 +111,19 @@ pub struct GlobalFeedTemplate {
     pub username: String,
     /// Feed items (book entries with author info)
     pub feed_items: Vec<crate::atproto::FeedItem>,
+}
+
+#[derive(Template)]
+#[template(path = "book_add.html")]
+pub struct BookAddTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    pub error_message: Option<String>,
+    /// Present after GPT extraction - contains title, author, publication_year
+    pub extracted_metadata: Option<BookMetadata>,
+    /// The model to use for GPT calls (preserved across requests)
+    pub model: String,
+    /// The original query that was searched (for display purposes)
+    pub query: String,
 }
