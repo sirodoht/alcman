@@ -1,6 +1,6 @@
 use askama::Template;
 use axum::{
-    extract::{Form, Path, Query, State},
+    extract::{Form, Json, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
 };
@@ -920,6 +920,24 @@ pub struct BookIncludeForm {
     pub finished_at: String,
 }
 
+#[derive(Deserialize)]
+pub struct ApiLibraryRequest {
+    pub title: String,
+    pub author: Option<String>,
+    pub publication_year: Option<i32>,
+    pub status: Option<String>,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct ApiLibraryResponse {
+    success: bool,
+    book_id: Option<String>,
+    status: Option<String>,
+    message: Option<String>,
+}
+
 pub async fn book_include_save(
     State(db): State<AppState>,
     headers: HeaderMap,
@@ -1010,4 +1028,127 @@ pub async fn book_include_save(
     .await;
 
     Redirect::to(&format!("/books/{}", book_id)).into_response()
+}
+
+pub async fn api_library_add(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<ApiLibraryRequest>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(ApiLibraryResponse {
+                success: false,
+                book_id: None,
+                status: None,
+                message: Some("login required".to_string()),
+            }),
+        )
+            .into_response();
+    };
+
+    let title = payload.title.trim();
+    if title.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiLibraryResponse {
+                success: false,
+                book_id: None,
+                status: None,
+                message: Some("title is required".to_string()),
+            }),
+        )
+            .into_response();
+    }
+
+    let author = payload
+        .author
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    let publication_year = payload.publication_year;
+
+    let status_value = payload
+        .status
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("wantToRead")
+        .to_string();
+
+    let started_at = payload
+        .started_at
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|date| {
+            if date.contains('T') {
+                date.to_string()
+            } else {
+                format!("{date}T00:00:00Z")
+            }
+        });
+
+    let finished_at = payload
+        .finished_at
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|date| {
+            if date.contains('T') {
+                date.to_string()
+            } else {
+                format!("{date}T00:00:00Z")
+            }
+        });
+
+    let book_id = match db
+        .find_or_create_book(title, author, publication_year)
+        .await
+    {
+        Ok(id) => id,
+        Err(error) => {
+            eprintln!("Book creation error (API): {error}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ApiLibraryResponse {
+                    success: false,
+                    book_id: None,
+                    status: None,
+                    message: Some("could not save book".to_string()),
+                }),
+            )
+                .into_response();
+        }
+    };
+
+    // Sync to PDS with user's personal data
+    sync_book_to_pds(
+        &db,
+        &user,
+        PdsBookEntry {
+            title,
+            author,
+            publication_year,
+            status: Some(status_value.clone()),
+            started_at,
+            finished_at,
+        },
+    )
+    .await;
+
+    (
+        StatusCode::OK,
+        Json(ApiLibraryResponse {
+            success: true,
+            book_id: Some(book_id),
+            status: Some(status_value),
+            message: None,
+        }),
+    )
+        .into_response()
 }

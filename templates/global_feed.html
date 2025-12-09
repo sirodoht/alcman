@@ -113,6 +113,12 @@
 
                         {% if is_authenticated && item.is_from_other_user(current_did) %}
                         <div class="feed-entry-actions">
+                            <button
+                                class="feed-entry-add-btn feed-entry-want-btn"
+                                data-title="{{ item.entry.book.title }}"
+                                data-author="{% if let Some(authors) = item.entry.book.authors %}{{ authors.join(", ") }}{% endif %}"
+                                data-year="{% if let Some(year) = item.entry.book.publication_year %}{{ year }}{% endif %}"
+                            >want to read</button>
                             <a href="/books/include?title={{ item.entry.book.title|urlencode }}{% if let Some(authors) = item.entry.book.authors %}&amp;author={{ authors.join(", ")|urlencode }}{% endif %}{% if let Some(year) = item.entry.book.publication_year %}&amp;year={{ year }}{% endif %}" class="feed-entry-add-btn">add to library</a>
                         </div>
                         {% endif %}
@@ -125,4 +131,58 @@
     {% endif %}
 
 </section>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const wantButtons = document.querySelectorAll('.feed-entry-want-btn');
+
+    wantButtons.forEach((button) => {
+        button.addEventListener('click', async () => {
+            if (button.dataset.loading === 'true') {
+                return;
+            }
+
+            const originalText = button.textContent;
+            const publicationYear = button.dataset.year ? parseInt(button.dataset.year, 10) : null;
+
+            button.dataset.loading = 'true';
+            button.disabled = true;
+            button.textContent = 'adding...';
+
+            const payload = {
+                title: button.dataset.title || '',
+                author: button.dataset.author || null,
+                publication_year: Number.isFinite(publicationYear) ? publicationYear : null,
+                status: 'wantToRead',
+            };
+
+            try {
+                const response = await fetch('/api/library', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (response.ok) {
+                    button.textContent = 'added';
+                    button.classList.add('feed-entry-add-btn-success');
+                } else {
+                    const data = await response.json().catch(() => null);
+                    const message = data?.message || 'try again';
+                    button.textContent = message;
+                    button.disabled = false;
+                    button.dataset.loading = 'false';
+                }
+            } catch (error) {
+                button.textContent = 'try again';
+                button.disabled = false;
+                button.dataset.loading = 'false';
+            }
+
+            if (button.disabled && button.textContent !== 'added') {
+                button.textContent = originalText;
+            }
+        });
+    });
+});
+</script>
 {% endblock content %}

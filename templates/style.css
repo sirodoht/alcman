@@ -714,3 +714,14 @@ select:focus {
     border-color: #ced4da;
     color: #2c3e50;
 }
+
+.feed-entry-add-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.feed-entry-add-btn-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
