@@ -42,6 +42,10 @@ pub struct BookDetailTemplate {
     pub username: String,
     pub book: Book,
     pub activities: Vec<crate::books::BookActivity>,
+    /// Whether this book is in the current user's library
+    pub in_current_user_library: bool,
+    /// Status in the current user's library (if present)
+    pub current_user_status: Option<String>,
 }
 
 #[derive(Template)]

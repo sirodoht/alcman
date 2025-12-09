@@ -288,6 +288,10 @@ pub struct FeedItem {
     pub author_did: String,
     /// Local database book ID (if available)
     pub book_id: Option<String>,
+    /// Whether this book is in the current user's library
+    pub in_current_user_library: bool,
+    /// Status in the current user's library (if present)
+    pub current_user_status: Option<String>,
 }
 
 impl FeedItem {

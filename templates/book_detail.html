@@ -22,6 +22,19 @@
     </div>
     {% endif %}
 
+    {% if is_authenticated %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label">Your Library</span>
+            {% if in_current_user_library %}
+            <span class="feed-entry-in-library">in your library{% if let Some(status) = current_user_status %} ({{ status }}){% endif %}</span>
+            {% else %}
+            <span class="page-value-muted">not in your library</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
     <div class="page-row">
         <div class="page-content">
             <span class="page-label">Amazon UK</span>

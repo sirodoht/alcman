@@ -4,6 +4,7 @@ use axum::{
     http::HeaderMap,
     response::{Html, IntoResponse, Redirect, Response},
 };
+use std::collections::HashMap;
 
 use crate::AppState;
 use crate::atproto::{FeedItem, PdsClient};
@@ -82,6 +83,8 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
                 author_username: user.username.clone(),
                 author_did: subject_did.clone(),
                 book_id: None,
+                in_current_user_library: false,
+                current_user_status: None,
             });
         }
     }
@@ -97,6 +100,13 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
     };
 
     Html(template.render().unwrap()).into_response()
+}
+
+/// Normalize a book key for comparison (lowercase title + author)
+fn normalize_book_key(title: &str, author: Option<&str>) -> String {
+    let normalized_title = title.trim().to_lowercase();
+    let normalized_author = author.map(|a| a.trim().to_lowercase()).unwrap_or_default();
+    format!("{}|{}", normalized_title, normalized_author)
 }
 
 /// Show a public global feed with book entries from all users on the PDS.
@@ -120,6 +130,23 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
         };
         return Html(template.render().unwrap()).into_response();
     };
+
+    // Build lookup of current user's library (book_key -> status)
+    let mut user_library: HashMap<String, Option<String>> = HashMap::new();
+    if let Some(ref did) = current_did {
+        if let Ok(entries) = pds_client.list_book_entries(did).await {
+            for entry in entries {
+                let book = &entry.value.book;
+                let author = book
+                    .authors
+                    .as_ref()
+                    .and_then(|a| a.first())
+                    .map(|s| s.as_str());
+                let key = normalize_book_key(&book.title, author);
+                user_library.insert(key, entry.value.status.clone());
+            }
+        }
+    }
 
     // Get all repositories from the PDS (not just local users)
     let repos = match pds_client.list_repos(Some(100)).await {
@@ -171,11 +198,24 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
                 }
             };
 
+            // Check if this book is in the current user's library
+            let author = book
+                .authors
+                .as_ref()
+                .and_then(|a| a.first())
+                .map(|s| s.as_str());
+            let book_key = normalize_book_key(&book.title, author);
+            let library_entry = user_library.get(&book_key);
+            let in_current_user_library = library_entry.is_some();
+            let current_user_status = library_entry.and_then(|s| s.clone());
+
             feed_items.push(FeedItem {
                 entry: entry.value,
                 author_username: author_username.clone(),
                 author_did: did.clone(),
                 book_id,
+                in_current_user_library,
+                current_user_status,
             });
         }
     }

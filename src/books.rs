@@ -250,12 +250,31 @@ async fn sync_book_to_pds(db: &Database, user: &User, entry: PdsBookEntry<'_>) {
     }
 }
 
+/// Check if two books match by title and author (case-insensitive)
+fn books_match(
+    entry_title: &str,
+    entry_authors: Option<&Vec<String>>,
+    book_title: &str,
+    book_author: Option<&str>,
+) -> bool {
+    let title_matches = entry_title.to_lowercase() == book_title.to_lowercase();
+    let author_matches = match (entry_authors, book_author) {
+        (Some(authors), Some(ba)) => authors
+            .iter()
+            .any(|a| a.to_lowercase() == ba.to_lowercase()),
+        (None, None) => true,
+        _ => false,
+    };
+    title_matches && author_matches
+}
+
 pub async fn book_detail(
     State(db): State<AppState>,
     headers: HeaderMap,
     Path(book_id): Path<String>,
 ) -> Response {
     let user = current_user(&db, &headers).await;
+    let current_did = user.as_ref().and_then(|u| u.did.clone());
 
     let book = match db.get_book_by_id(&book_id).await {
         Ok(Some(book)) => book,
@@ -268,8 +287,29 @@ pub async fn book_detail(
 
     // Fetch activity from PDS
     let mut activities: Vec<BookActivity> = Vec::new();
+    let mut in_current_user_library = false;
+    let mut current_user_status: Option<String> = None;
 
     if let Some(pds_client) = PdsClient::from_env() {
+        // Check if the current user has this book in their library
+        if let Some(ref did) = current_did {
+            if let Ok(entries) = pds_client.list_book_entries(did).await {
+                for entry in entries {
+                    let entry_book = &entry.value.book;
+                    if books_match(
+                        &entry_book.title,
+                        entry_book.authors.as_ref(),
+                        &book.title,
+                        book.author.as_deref(),
+                    ) {
+                        in_current_user_library = true;
+                        current_user_status = entry.value.status.clone();
+                        break;
+                    }
+                }
+            }
+        }
+
         // Get all repositories from the PDS
         let repos = match pds_client.list_repos(Some(100)).await {
             Ok(repos) => repos,
@@ -302,16 +342,12 @@ pub async fn book_detail(
             // Check if any entry matches this book
             for entry in entries {
                 let entry_book = &entry.value.book;
-                let title_matches = entry_book.title.to_lowercase() == book.title.to_lowercase();
-                let author_matches = match (&entry_book.authors, &book.author) {
-                    (Some(authors), Some(book_author)) => authors
-                        .iter()
-                        .any(|a| a.to_lowercase() == book_author.to_lowercase()),
-                    (None, None) => true,
-                    _ => false,
-                };
-
-                if title_matches && author_matches {
+                if books_match(
+                    &entry_book.title,
+                    entry_book.authors.as_ref(),
+                    &book.title,
+                    book.author.as_deref(),
+                ) {
                     activities.push(BookActivity {
                         username: username.clone(),
                         did: did.clone(),
@@ -332,6 +368,8 @@ pub async fn book_detail(
         username: user.map(|u| u.username).unwrap_or_default(),
         book,
         activities,
+        in_current_user_library,
+        current_user_status,
     };
     Html(template.render().unwrap()).into_response()
 }

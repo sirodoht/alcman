@@ -132,6 +132,12 @@ main {
     text-decoration: none;
 }
 
+.page-value-muted {
+    color: #adb5bd;
+    font-size: 13px;
+    font-style: italic;
+}
+
 .page-error {
     max-width: var(--width);
     margin: 0 auto;
@@ -724,4 +730,15 @@ select:focus {
     background-color: #d4edda;
     border-color: #c3e6cb;
     color: #155724;
+}
+
+.feed-entry-in-library {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    display: inline-block;
 }

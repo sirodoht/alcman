@@ -113,6 +113,9 @@
 
                         {% if is_authenticated && item.is_from_other_user(current_did) %}
                         <div class="feed-entry-actions">
+                            {% if item.in_current_user_library %}
+                            <span class="feed-entry-in-library">in your library{% if let Some(status) = item.current_user_status %} ({{ status }}){% endif %}</span>
+                            {% else %}
                             <button
                                 class="feed-entry-add-btn feed-entry-want-btn"
                                 data-title="{{ item.entry.book.title }}"
@@ -120,6 +123,7 @@
                                 data-year="{% if let Some(year) = item.entry.book.publication_year %}{{ year }}{% endif %}"
                             >want to read</button>
                             <a href="/books/include?title={{ item.entry.book.title|urlencode }}{% if let Some(authors) = item.entry.book.authors %}&amp;author={{ authors.join(", ")|urlencode }}{% endif %}{% if let Some(year) = item.entry.book.publication_year %}&amp;year={{ year }}{% endif %}" class="feed-entry-add-btn">add to library</a>
+                            {% endif %}
                         </div>
                         {% endif %}
                     </div>
