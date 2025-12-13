@@ -1303,6 +1303,25 @@ pub async fn book_notes_submit(
         return Redirect::to("/login").into_response();
     };
 
+    // Validate notes length (max 20,000 characters)
+    if form.notes.len() > 20_000 {
+        let book = match db.get_book_by_id(&book_id).await {
+            Ok(Some(book)) => book,
+            Ok(None) => return Redirect::to("/").into_response(),
+            Err(_) => return Redirect::to("/").into_response(),
+        };
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: Some(form.notes),
+            error_message: Some("Notes must be 20,000 characters or less".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
     let book = match db.get_book_by_id(&book_id).await {
         Ok(Some(book)) => book,
         Ok(None) => return Redirect::to("/").into_response(),

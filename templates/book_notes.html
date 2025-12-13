@@ -27,7 +27,7 @@
         <div class="page-row">
             <div class="page-content">
                 <label for="notes">your notes</label>
-                <textarea id="notes" name="notes" rows="10" placeholder="Add your thoughts about this book...">{{ current_notes.as_deref().unwrap_or_default() }}</textarea>
+                <textarea id="notes" name="notes" rows="10" maxlength="20000" placeholder="Add your thoughts about this book...">{{ current_notes.as_deref().unwrap_or_default() }}</textarea>
             </div>
         </div>
         <div class="page-row">
