@@ -67,8 +67,11 @@
                         </div>
 
                         {% if let Some(notes) = item.entry.notes %}
-                        <div class="feed-entry-notes">
-                            <p>{{ notes }}</p>
+                        <div class="feed-entry-notes-container">
+                            <div class="feed-entry-notes">
+                                <p>{{ notes }}</p>
+                            </div>
+                            <button class="feed-entry-notes-expand">show more</button>
                         </div>
                         {% endif %}
 
@@ -123,6 +126,28 @@
 </section>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Notes expand/collapse
+    const notesContainers = document.querySelectorAll('.feed-entry-notes-container');
+    notesContainers.forEach((container) => {
+        const notes = container.querySelector('.feed-entry-notes');
+        const expandBtn = container.querySelector('.feed-entry-notes-expand');
+
+        if (notes.scrollHeight > notes.clientHeight) {
+            expandBtn.classList.add('visible');
+        }
+
+        expandBtn.addEventListener('click', () => {
+            if (notes.classList.contains('expanded')) {
+                notes.classList.remove('expanded');
+                expandBtn.textContent = 'show more';
+            } else {
+                notes.classList.add('expanded');
+                expandBtn.textContent = 'show less';
+            }
+        });
+    });
+
+    // Want to read buttons
     const wantButtons = document.querySelectorAll('.feed-entry-want-btn');
 
     wantButtons.forEach((button) => {

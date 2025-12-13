@@ -652,22 +652,50 @@ select:focus {
     }
 }
 
-.feed-entry-notes {
+.feed-entry-notes-container {
     margin-top: 12px;
+}
+
+.feed-entry-notes {
     color: #000;
     font-size: 17px;
     font-weight: 500;
     line-height: 1.6;
-    max-height: 200px;
+    max-height: 150px;
     overflow: hidden;
     position: relative;
     padding: 0;
+}
+
+.feed-entry-notes.expanded {
+    max-height: none;
 }
 
 .feed-entry-notes p {
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+
+.feed-entry-notes-expand {
+    display: none;
+    margin-top: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: #6c757d;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.feed-entry-notes-expand:hover {
+    color: #2c3e50;
+    background: none;
+}
+
+.feed-entry-notes-expand.visible {
+    display: inline-block;
 }
 
 .feed-entry-actions {
