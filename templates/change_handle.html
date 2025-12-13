@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}change username{% endblock title %}
+
+{% block content %}
+<section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>change username</h1>
+        </div>
+    </div>
+
+    {% if let Some(error) = error_message %}
+    <div class="page-row">
+        <div class="page-error">{{ error }}</div>
+    </div>
+    {% endif %}
+
+    {% if let Some(success) = success_message %}
+    <div class="page-row">
+        <div class="page-success">{{ success }}</div>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/profile/handle">
+        <div class="page-row">
+            <div class="page-content">
+                <label for="new_username">new username</label>
+                <input type="text" id="new_username" name="new_username" required>
+            </div>
+        </div>
+        <div class="page-row">
+            <div class="page-content page-actions">
+                <a href="/profile" class="btn">cancel</a>
+                <button type="submit">change username</button>
+            </div>
+        </div>
+    </form>
+</section>
+{% endblock content %}

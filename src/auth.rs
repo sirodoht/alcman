@@ -11,7 +11,9 @@ use crate::AppState;
 use crate::atproto::PdsClient;
 use crate::database::Database;
 use crate::pds::AuthenticatedPds;
-use crate::templates::{ChangePasswordTemplate, LoginTemplate, ProfileTemplate, SignupTemplate};
+use crate::templates::{
+    ChangeHandleTemplate, ChangePasswordTemplate, LoginTemplate, ProfileTemplate, SignupTemplate,
+};
 
 // User-related structures
 #[derive(sqlx::FromRow, Serialize, Clone)]
@@ -524,6 +526,147 @@ pub async fn change_password(
                 signups_disabled: signups_disabled(),
                 username: user.username,
                 error_message: Some("Could not update password. Please try again.".to_string()),
+                success_message: None,
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+    }
+}
+
+pub async fn change_handle_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    if user.is_none() {
+        return Redirect::to("/login").into_response();
+    }
+
+    let template = ChangeHandleTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.map(|u| u.username).unwrap_or_default(),
+        error_message: None,
+        success_message: None,
+    };
+
+    Html(template.render().unwrap()).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct ChangeHandleForm {
+    pub new_username: String,
+}
+
+pub async fn change_handle(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<ChangeHandleForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let new_username = form.new_username.trim().to_string();
+
+    // Validate username
+    if new_username.is_empty() {
+        let template = ChangeHandleTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Username cannot be empty".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    if new_username.contains('.') || new_username.contains('@') {
+        let template = ChangeHandleTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("Username cannot contain dots or @ symbols".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    // Get PDS client
+    let Some(pds_client) = PdsClient::from_env() else {
+        let template = ChangeHandleTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("AT Protocol not configured".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Create full handle from username
+    let new_handle = match pds_client.make_handle(&new_username) {
+        Ok(handle) => handle,
+        Err(error) => {
+            let template = ChangeHandleTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                error_message: Some(format!("Invalid username: {}", error)),
+                success_message: None,
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    // Get authenticated PDS client
+    let Some(mut auth_pds) = AuthenticatedPds::new(&pds_client, &db, &user) else {
+        let template = ChangeHandleTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some("AT Protocol credentials not available".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Update handle on PDS
+    if let Err(error) = auth_pds.update_handle(&new_handle).await {
+        eprintln!("PDS handle update error: {error}");
+        let template = ChangeHandleTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            error_message: Some(format!("Could not update handle on PDS: {}", error)),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    }
+
+    // Update username in local database
+    match db.update_username(&user.id, &new_username).await {
+        Ok(_) => {
+            println!(
+                "Updated username for user {}: {} -> {}",
+                user.id, user.username, new_username
+            );
+            let template = ChangeHandleTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: new_username,
+                error_message: None,
+                success_message: Some("Username changed successfully".to_string()),
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+        Err(error) => {
+            eprintln!("Database username update error: {error}");
+            let template = ChangeHandleTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                error_message: Some(format!("Could not update username: {}", error)),
                 success_message: None,
             };
             Html(template.render().unwrap()).into_response()

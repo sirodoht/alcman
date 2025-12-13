@@ -142,4 +142,18 @@ impl<'a> AuthenticatedPds<'a> {
 
         result
     }
+
+    /// Update the user's handle on the PDS
+    pub async fn update_handle(&mut self, handle: &str) -> AtprotoResult<()> {
+        let result = self.client.update_handle(&self.access_jwt, handle).await;
+
+        if let Err(ref error) = result
+            && error.is_expired_token()
+            && self.refresh_token().await
+        {
+            return self.client.update_handle(&self.access_jwt, handle).await;
+        }
+
+        result
+    }
 }

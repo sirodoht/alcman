@@ -89,6 +89,16 @@ pub struct ChangePasswordTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "change_handle.html")]
+pub struct ChangeHandleTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    pub error_message: Option<String>,
+    pub success_message: Option<String>,
+}
+
+#[derive(Template)]
 #[template(path = "book_edit_chat.html")]
 pub struct BookEditChatTemplate {
     pub is_authenticated: bool,

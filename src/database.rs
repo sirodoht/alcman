@@ -271,6 +271,30 @@ impl Database {
         Ok(())
     }
 
+    pub async fn update_username(&self, user_id: &str, new_username: &str) -> Result<(), DynError> {
+        // Check if new username already exists for a different user
+        let existing = sqlx::query("SELECT id FROM users WHERE username = ? AND id != ?")
+            .bind(new_username)
+            .bind(user_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        if existing.is_some() {
+            return Err("Username already exists".into());
+        }
+
+        let now = chrono::Utc::now().to_rfc3339();
+
+        sqlx::query("UPDATE users SET username = ?, updated_at = ? WHERE id = ?")
+            .bind(new_username)
+            .bind(&now)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(())
+    }
+
     /// Get a user by their AT Protocol DID
     pub async fn get_user_by_did(&self, did: &str) -> Result<Option<crate::auth::User>, DynError> {
         let user_row = sqlx::query(

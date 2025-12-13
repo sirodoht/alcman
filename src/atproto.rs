@@ -332,6 +332,14 @@ pub struct DeleteRecordRequest {
     pub rkey: String,
 }
 
+/// Request to update handle via com.atproto.identity.updateHandle
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateHandleRequest {
+    /// The new handle
+    pub handle: String,
+}
+
 /// Response from com.atproto.sync.listRepos
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -876,6 +884,40 @@ impl PdsClient {
         } else {
             // Not following, nothing to delete
             Ok(())
+        }
+    }
+
+    /// Update the handle for the authenticated user.
+    ///
+    /// Calls com.atproto.identity.updateHandle
+    pub async fn update_handle(&self, access_jwt: &str, handle: &str) -> AtprotoResult<()> {
+        let url = format!("{}/xrpc/com.atproto.identity.updateHandle", self.pds_url);
+
+        println!("[HTTP] POST {} (handle: {})", url, handle);
+
+        let request = UpdateHandleRequest {
+            handle: handle.to_string(),
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", access_jwt))
+            .json(&request)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
         }
     }
 }
