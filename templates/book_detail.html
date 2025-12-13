@@ -63,6 +63,9 @@
     <div class="page-row">
         <div class="page-content page-actions">
             {% if is_authenticated %}
+            {% if in_current_user_library %}
+            <a href="/books/{{ book.id }}/notes" class="btn">notes</a>
+            {% endif %}
             <a href="/books/{{ book.id }}/edit" class="btn">edit</a>
             <a href="/books/{{ book.id }}/edit-chat" class="btn">edit in chat</a>
             <form method="post" action="/books/{{ book.id }}/delete" onsubmit="return confirm('sure?');">

@@ -17,7 +17,7 @@ use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
     BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate,
-    BookIncludeTemplate, BookListTemplate,
+    BookIncludeTemplate, BookListTemplate, BookNotesTemplate,
 };
 
 /// Check if a model name is a Claude model
@@ -1189,4 +1189,240 @@ pub async fn api_library_add(
         }),
     )
         .into_response()
+}
+
+/// Show the book notes page
+pub async fn book_notes_page(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Path(book_id): Path<String>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let book = match db.get_book_by_id(&book_id).await {
+        Ok(Some(book)) => book,
+        Ok(None) => return Redirect::to("/").into_response(),
+        Err(error) => {
+            eprintln!("Error fetching book: {error}");
+            return Redirect::to("/").into_response();
+        }
+    };
+
+    // Get PDS client
+    let Some(pds_client) = PdsClient::from_env() else {
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: None,
+            error_message: Some("AT Protocol not configured".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    let Some(user_did) = &user.did else {
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: None,
+            error_message: Some("You don't have an AT Protocol account".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Find user's book entry for this book
+    let entries = match pds_client.list_book_entries(user_did).await {
+        Ok(entries) => entries,
+        Err(error) => {
+            eprintln!("Error fetching book entries: {error}");
+            let template = BookNotesTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                book,
+                current_notes: None,
+                error_message: Some("Could not fetch your library".to_string()),
+                success_message: None,
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    // Find the matching entry
+    let mut current_notes = None;
+    for entry in entries {
+        let entry_book = &entry.value.book;
+        if books_match(
+            &entry_book.title,
+            entry_book.authors.as_ref(),
+            &book.title,
+            book.author.as_deref(),
+        ) {
+            current_notes = entry.value.notes.clone();
+            break;
+        }
+    }
+
+    let template = BookNotesTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.username,
+        book,
+        current_notes,
+        error_message: None,
+        success_message: None,
+    };
+
+    Html(template.render().unwrap()).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct BookNotesForm {
+    pub notes: String,
+}
+
+/// Submit book notes
+pub async fn book_notes_submit(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Path(book_id): Path<String>,
+    Form(form): Form<BookNotesForm>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
+    };
+
+    let book = match db.get_book_by_id(&book_id).await {
+        Ok(Some(book)) => book,
+        Ok(None) => return Redirect::to("/").into_response(),
+        Err(error) => {
+            eprintln!("Error fetching book: {error}");
+            return Redirect::to("/").into_response();
+        }
+    };
+
+    // Get PDS client
+    let Some(pds_client) = PdsClient::from_env() else {
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: Some(form.notes),
+            error_message: Some("AT Protocol not configured".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    let Some(mut auth_pds) = AuthenticatedPds::new(&pds_client, &db, &user) else {
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: Some(form.notes),
+            error_message: Some("AT Protocol credentials not available".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Find user's book entry for this book
+    let entries = match pds_client.list_book_entries(auth_pds.did()).await {
+        Ok(entries) => entries,
+        Err(error) => {
+            eprintln!("Error fetching book entries: {error}");
+            let template = BookNotesTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                book,
+                current_notes: Some(form.notes),
+                error_message: Some("Could not fetch your library".to_string()),
+                success_message: None,
+            };
+            return Html(template.render().unwrap()).into_response();
+        }
+    };
+
+    // Find the matching entry and get its rkey
+    let mut found_entry = None;
+    for entry in entries {
+        let entry_book = &entry.value.book;
+        if books_match(
+            &entry_book.title,
+            entry_book.authors.as_ref(),
+            &book.title,
+            book.author.as_deref(),
+        ) {
+            // Extract rkey from URI: at://did/collection/rkey
+            if let Some(rkey) = entry.uri.split('/').next_back() {
+                found_entry = Some((rkey.to_string(), entry.value));
+            }
+            break;
+        }
+    }
+
+    let Some((rkey, mut entry_record)) = found_entry else {
+        let template = BookNotesTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            book,
+            current_notes: Some(form.notes),
+            error_message: Some("This book is not in your library".to_string()),
+            success_message: None,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Update the notes field
+    let notes = form.notes.trim().to_string();
+    entry_record.notes = if notes.is_empty() {
+        None
+    } else {
+        Some(notes.clone())
+    };
+
+    // Update the record on PDS
+    match auth_pds.update_book_entry(&rkey, entry_record).await {
+        Ok(_) => {
+            println!("Updated notes for book {} (rkey: {})", book_id, rkey);
+            let template = BookNotesTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                book,
+                current_notes: if notes.is_empty() { None } else { Some(notes) },
+                error_message: None,
+                success_message: Some("Notes saved successfully".to_string()),
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+        Err(error) => {
+            eprintln!("Error updating book entry: {error}");
+            let template = BookNotesTemplate {
+                is_authenticated: true,
+                signups_disabled: signups_disabled(),
+                username: user.username,
+                book,
+                current_notes: if notes.is_empty() { None } else { Some(notes) },
+                error_message: Some(format!("Could not save notes: {}", error)),
+                success_message: None,
+            };
+            Html(template.render().unwrap()).into_response()
+        }
+    }
 }

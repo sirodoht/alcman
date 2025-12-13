@@ -177,7 +177,7 @@ impl BookRef {
 }
 
 /// A user's book entry record (app.alcman.book.entry)
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BookEntryRecord {
     /// Record type identifier
@@ -338,6 +338,20 @@ pub struct DeleteRecordRequest {
 pub struct UpdateHandleRequest {
     /// The new handle
     pub handle: String,
+}
+
+/// Request to update a record via com.atproto.repo.putRecord
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PutRecordRequest<T: Serialize> {
+    /// The DID of the repo
+    pub repo: String,
+    /// The NSID of the record collection
+    pub collection: String,
+    /// The record key (rkey)
+    pub rkey: String,
+    /// The record to store
+    pub record: T,
 }
 
 /// Response from com.atproto.sync.listRepos
@@ -620,6 +634,54 @@ impl PdsClient {
     ) -> AtprotoResult<CreateRecordResponse> {
         self.create_record(access_jwt, repo, collection, record)
             .await
+    }
+
+    /// Update a record in a user's repository.
+    ///
+    /// Calls com.atproto.repo.putRecord
+    pub async fn put_record<T: Serialize>(
+        &self,
+        access_jwt: &str,
+        repo: &str,
+        collection: &str,
+        rkey: &str,
+        record: T,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        let url = format!("{}/xrpc/com.atproto.repo.putRecord", self.pds_url);
+
+        println!(
+            "[HTTP] POST {} (collection: {}, rkey: {})",
+            url, collection, rkey
+        );
+
+        let request = PutRecordRequest {
+            repo: repo.to_string(),
+            collection: collection.to_string(),
+            rkey: rkey.to_string(),
+            record,
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", access_jwt))
+            .json(&request)
+            .send()
+            .await?;
+
+        if response.status().is_success() {
+            let result: CreateRecordResponse = response.json().await?;
+            Ok(result)
+        } else {
+            let error: XrpcError = response.json().await.unwrap_or(XrpcError {
+                error: "UnknownError".to_string(),
+                message: Some("Failed to parse error response".to_string()),
+            });
+            Err(AtprotoError::Xrpc {
+                error: error.error,
+                message: error.message,
+            })
+        }
     }
 
     /// Create a book entry record in a user's repository.

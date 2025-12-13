@@ -160,3 +160,15 @@ pub struct BookIncludeTemplate {
     /// Book publication year from the feed
     pub publication_year: String,
 }
+
+#[derive(Template)]
+#[template(path = "book_notes.html")]
+pub struct BookNotesTemplate {
+    pub is_authenticated: bool,
+    pub signups_disabled: bool,
+    pub username: String,
+    pub book: Book,
+    pub current_notes: Option<String>,
+    pub error_message: Option<String>,
+    pub success_message: Option<String>,
+}

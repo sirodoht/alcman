@@ -1,4 +1,4 @@
-use crate::atproto::{AtprotoResult, BookRef, CreateRecordResponse, PdsClient};
+use crate::atproto::{AtprotoResult, BookEntryRecord, BookRef, CreateRecordResponse, PdsClient};
 use crate::auth::User;
 use crate::database::Database;
 
@@ -152,6 +152,42 @@ impl<'a> AuthenticatedPds<'a> {
             && self.refresh_token().await
         {
             return self.client.update_handle(&self.access_jwt, handle).await;
+        }
+
+        result
+    }
+
+    /// Update a book entry record in the user's repository
+    pub async fn update_book_entry(
+        &mut self,
+        rkey: &str,
+        entry: BookEntryRecord,
+    ) -> AtprotoResult<CreateRecordResponse> {
+        let result = self
+            .client
+            .put_record(
+                &self.access_jwt,
+                &self.did,
+                "app.alcman.book.entry",
+                rkey,
+                entry.clone(),
+            )
+            .await;
+
+        if let Err(ref error) = result
+            && error.is_expired_token()
+            && self.refresh_token().await
+        {
+            return self
+                .client
+                .put_record(
+                    &self.access_jwt,
+                    &self.did,
+                    "app.alcman.book.entry",
+                    rkey,
+                    entry,
+                )
+                .await;
         }
 
         result

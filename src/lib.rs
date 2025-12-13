@@ -32,6 +32,7 @@ pub fn create_app(db: AppState) -> Router {
         api_library_add, book_add_extract, book_add_page, book_add_refine, book_add_save,
         book_delete, book_detail, book_edit_chat_apply, book_edit_chat_page, book_edit_chat_submit,
         book_edit_page, book_edit_submit, book_include_page, book_include_save, book_list,
+        book_notes_page, book_notes_submit,
     };
     use feed::{following_feed_page, global_feed_page, home_redirect};
 
@@ -74,6 +75,10 @@ pub fn create_app(db: AppState) -> Router {
         )
         .route("/books/{id}/edit-chat/apply", post(book_edit_chat_apply))
         .route("/books/{id}/delete", post(book_delete))
+        .route(
+            "/books/{id}/notes",
+            get(book_notes_page).post(book_notes_submit),
+        )
         .route("/api/library", post(api_library_add))
         .with_state(db)
 }
