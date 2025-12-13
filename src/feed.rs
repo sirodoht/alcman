@@ -138,18 +138,18 @@ pub async fn global_feed_page(State(db): State<AppState>, headers: HeaderMap) ->
 
     // Build lookup of current user's library (book_key -> status)
     let mut user_library: HashMap<String, Option<String>> = HashMap::new();
-    if let Some(ref did) = current_did {
-        if let Ok(entries) = pds_client.list_book_entries(did).await {
-            for entry in entries {
-                let book = &entry.value.book;
-                let author = book
-                    .authors
-                    .as_ref()
-                    .and_then(|a| a.first())
-                    .map(|s| s.as_str());
-                let key = normalize_book_key(&book.title, author);
-                user_library.insert(key, entry.value.status.clone());
-            }
+    if let Some(ref did) = current_did
+        && let Ok(entries) = pds_client.list_book_entries(did).await
+    {
+        for entry in entries {
+            let book = &entry.value.book;
+            let author = book
+                .authors
+                .as_ref()
+                .and_then(|a| a.first())
+                .map(|s| s.as_str());
+            let key = normalize_book_key(&book.title, author);
+            user_library.insert(key, entry.value.status.clone());
         }
     }
 

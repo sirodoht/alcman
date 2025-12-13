@@ -292,20 +292,20 @@ pub async fn book_detail(
 
     if let Some(pds_client) = PdsClient::from_env() {
         // Check if the current user has this book in their library
-        if let Some(ref did) = current_did {
-            if let Ok(entries) = pds_client.list_book_entries(did).await {
-                for entry in entries {
-                    let entry_book = &entry.value.book;
-                    if books_match(
-                        &entry_book.title,
-                        entry_book.authors.as_ref(),
-                        &book.title,
-                        book.author.as_deref(),
-                    ) {
-                        in_current_user_library = true;
-                        current_user_status = entry.value.status.clone();
-                        break;
-                    }
+        if let Some(ref did) = current_did
+            && let Ok(entries) = pds_client.list_book_entries(did).await
+        {
+            for entry in entries {
+                let entry_book = &entry.value.book;
+                if books_match(
+                    &entry_book.title,
+                    entry_book.authors.as_ref(),
+                    &book.title,
+                    book.author.as_deref(),
+                ) {
+                    in_current_user_library = true;
+                    current_user_status = entry.value.status.clone();
+                    break;
                 }
             }
         }

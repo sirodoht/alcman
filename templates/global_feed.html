@@ -29,21 +29,7 @@
                     <div class="feed-entry-user-info">
                         <span class="feed-entry-user-action">
                             <a href="/profile/{{ item.author_did }}" class="feed-entry-username">{{ item.author_username }}</a>
-                            {% if let Some(status) = item.entry.status %}
-                                {% if status == "reading" %}
-                                is reading
-                                {% elif status == "finished" %}
-                                finished
-                                {% elif status == "wantToRead" %}
-                                wants to read
-                                {% elif status == "dropped" %}
-                                did not finish
-                                {% else %}
-                                updated
-                                {% endif %}
-                            {% else %}
                             added
-                            {% endif %}
                         </span>
                         <span class="feed-entry-timestamp">{{ item.entry.created_date() }}</span>
                     </div>
@@ -83,15 +69,15 @@
                         {% if let Some(status) = item.entry.status %}
                         <div class="feed-entry-status-section">
                             {% if status == "reading" %}
-                            <span class="feed-entry-status feed-entry-status-reading">reading</span>
+                            <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">reading</span>
                             {% elif status == "finished" %}
-                            <span class="feed-entry-status feed-entry-status-finished">finished</span>
+                            <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">finished</span>
                             {% elif status == "wantToRead" %}
-                            <span class="feed-entry-status feed-entry-status-wanttoread">want to read</span>
+                            <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">want to read</span>
                             {% elif status == "dropped" %}
-                            <span class="feed-entry-status feed-entry-status-dropped">did not finish</span>
+                            <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">did not finish</span>
                             {% else %}
-                            <span class="feed-entry-status">{{ status }}</span>
+                            <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">{{ status }}</span>
                             {% endif %}
                         </div>
                         {% endif %}
