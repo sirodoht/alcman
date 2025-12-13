@@ -59,6 +59,8 @@ pub struct BookDetailTemplate {
     pub in_current_user_library: bool,
     /// Status in the current user's library (if present)
     pub current_user_status: Option<String>,
+    /// Notes from the current user's library (if present)
+    pub current_user_notes: Option<String>,
 }
 
 #[derive(Template)]

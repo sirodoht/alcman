@@ -398,6 +398,7 @@ pub async fn book_detail(
     let mut activities: Vec<BookActivity> = Vec::new();
     let mut in_current_user_library = false;
     let mut current_user_status: Option<String> = None;
+    let mut current_user_notes: Option<String> = None;
 
     if let Some(pds_client) = PdsClient::from_env() {
         // Check if the current user has this book in their library
@@ -414,6 +415,7 @@ pub async fn book_detail(
                 ) {
                     in_current_user_library = true;
                     current_user_status = entry.value.status.clone();
+                    current_user_notes = entry.value.notes.clone();
                     break;
                 }
             }
@@ -479,6 +481,7 @@ pub async fn book_detail(
         activities,
         in_current_user_library,
         current_user_status,
+        current_user_notes,
     };
     Html(template.render().unwrap()).into_response()
 }

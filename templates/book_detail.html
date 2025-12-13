@@ -33,6 +33,14 @@
             {% endif %}
         </div>
     </div>
+    {% if let Some(notes) = current_user_notes %}
+    <div class="page-row">
+        <div class="page-content">
+            <span class="page-label page-noteslabel">Your Notes</span>
+            <span class="page-notes">{{ notes }}</span>
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     <div class="page-row">
