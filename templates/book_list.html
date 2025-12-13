@@ -1,21 +1,43 @@
 {% extends "layout.html" %}
 
-{% block title %}books{% endblock title %}
+{% block title %}my books{% endblock title %}
 
 {% block content %}
 <section>
+    <div class="page-row">
+        <div class="page-header">
+            <h1>books</h1>
+            <p>personal library</p>
+        </div>
+    </div>
+
+    <div class="filters">
+        <div class="filters-content">
+            <a href="/books" class="filters-link{% if filter.is_none() %} filters-link-active{% endif %}">all</a>
+            <a href="/books?filter=reading" class="filters-link{% if filter.as_deref() == Some("reading") %} filters-link-active{% endif %}">reading</a>
+            <a href="/books?filter=finished" class="filters-link{% if filter.as_deref() == Some("finished") %} filters-link-active{% endif %}">finished</a>
+            <a href="/books?filter=wantToRead" class="filters-link{% if filter.as_deref() == Some("wantToRead") %} filters-link-active{% endif %}">want to read</a>
+            <a href="/books?filter=dropped" class="filters-link{% if filter.as_deref() == Some("dropped") %} filters-link-active{% endif %}">did not finish</a>
+        </div>
+    </div>
+
     {% if books.is_empty() %}
     <section>
-        <div style="max-width: var(--width); margin: 0 auto;">
-            <p><em>(no books)</em></p>
+        <div class="page-row">
+            <div class="page-content">
+                <p><em>no books yet. <a href="/books/add">add your first book</a></em></p>
+            </div>
         </div>
     </section>
     {% else %}
     <div class="books-list">
-
         {% for book in books %}
         <div class="books-list-item">
-            <a href="/books/{{ book.id }}" class="books-list-item-link">
+            {% if let Some(id) = book.book_id %}
+            <a href="/books/{{ id }}" class="books-list-item-link">
+            {% else %}
+            <div class="books-list-item-link">
+            {% endif %}
                 <div class="books-list-item-info">
                     <span class="books-list-item-title">
                         {% if book.title.is_empty() %}
@@ -23,20 +45,33 @@
                         {% else %}
                             {{ book.title }}
                         {% endif %}
+                        {% if book.has_notes %}<span class="books-list-item-notes-icon" title="has notes">*</span>{% endif %}
                     </span>
                     {% if let Some(author) = book.author %}
                     <span class="books-list-item-author">{{ author }}</span>
                     {% endif %}
                 </div>
                 <div class="books-list-item-meta">
+                    {% if let Some(status) = book.status %}
+                    <span class="books-list-item-status">
+                        {% if status == "reading" %}reading
+                        {% elif status == "finished" %}finished
+                        {% elif status == "wantToRead" %}want to read
+                        {% elif status == "dropped" %}did not finish
+                        {% else %}{{ status }}{% endif %}
+                    </span>
+                    {% endif %}
                     {% if let Some(year) = book.publication_year %}
                     <span class="books-list-item-year">{{ year }}</span>
                     {% endif %}
                 </div>
+            {% if let Some(id) = book.book_id %}
             </a>
+            {% else %}
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
-
     </div>
     {% endif %}
 </section>

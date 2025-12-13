@@ -4,13 +4,25 @@ use crate::atproto::BookEntryRecord;
 use crate::books::Book;
 use crate::gpt::{BookEditResult, BookMetadata};
 
+/// A book in the user's library (from PDS)
+pub struct LibraryBook {
+    pub title: String,
+    pub author: Option<String>,
+    pub publication_year: Option<i32>,
+    pub status: Option<String>,
+    pub has_notes: bool,
+    /// Local database book ID (if exists)
+    pub book_id: Option<String>,
+}
+
 #[derive(Template)]
 #[template(path = "book_list.html")]
 pub struct BookListTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,
-    pub books: Vec<Book>,
+    pub books: Vec<LibraryBook>,
+    pub filter: Option<String>,
 }
 
 #[derive(Template)]

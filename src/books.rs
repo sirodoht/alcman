@@ -17,7 +17,7 @@ use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
     BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate,
-    BookIncludeTemplate, BookListTemplate, BookNotesTemplate,
+    BookIncludeTemplate, BookListTemplate, BookNotesTemplate, LibraryBook,
 };
 
 /// Check if a model name is a Claude model
@@ -187,18 +187,127 @@ pub struct BookAddSaveForm {
     pub query: String,
 }
 
-pub async fn book_list(State(db): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
-    let user = current_user(&db, &headers).await;
-    let books = db.get_all_books().await.unwrap_or_default();
+#[derive(Deserialize)]
+pub struct BookListQuery {
+    pub filter: Option<String>,
+}
 
-    let template = BookListTemplate {
-        is_authenticated: user.is_some(),
-        signups_disabled: signups_disabled(),
-        username: user.map(|u| u.username).unwrap_or_default(),
-        books,
+pub async fn book_list(
+    State(db): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<BookListQuery>,
+) -> Response {
+    let user = current_user(&db, &headers).await;
+
+    let Some(user) = user else {
+        return Redirect::to("/login").into_response();
     };
 
-    Html(template.render().unwrap())
+    let Some(user_did) = &user.did else {
+        // User doesn't have a DID, show empty library
+        let template = BookListTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            books: vec![],
+            filter: query.filter,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    let Some(pds_client) = PdsClient::from_env() else {
+        // PDS not configured, show empty library
+        let template = BookListTemplate {
+            is_authenticated: true,
+            signups_disabled: signups_disabled(),
+            username: user.username,
+            books: vec![],
+            filter: query.filter,
+        };
+        return Html(template.render().unwrap()).into_response();
+    };
+
+    // Fetch user's book entries from PDS
+    let entries = match pds_client.list_book_entries(user_did).await {
+        Ok(entries) => entries,
+        Err(error) => {
+            eprintln!("Error fetching book entries: {error}");
+            vec![]
+        }
+    };
+
+    // Convert to LibraryBook items
+    let mut books: Vec<LibraryBook> = Vec::new();
+    for entry in entries {
+        let book_ref = &entry.value.book;
+
+        // Try to find matching book in local database for the ID
+        let book_id = match db
+            .find_book_by_title_author(
+                &book_ref.title,
+                book_ref
+                    .authors
+                    .as_ref()
+                    .and_then(|a| a.first())
+                    .map(|s| s.as_str()),
+            )
+            .await
+        {
+            Ok(Some(book)) => Some(book.id),
+            _ => None,
+        };
+
+        let status = entry.value.status.clone();
+
+        // Apply filter if specified
+        if let Some(ref filter) = query.filter {
+            match filter.as_str() {
+                "reading" => {
+                    if status.as_deref() != Some("reading") {
+                        continue;
+                    }
+                }
+                "finished" => {
+                    if status.as_deref() != Some("finished") {
+                        continue;
+                    }
+                }
+                "wantToRead" => {
+                    if status.as_deref() != Some("wantToRead") {
+                        continue;
+                    }
+                }
+                "dropped" => {
+                    if status.as_deref() != Some("dropped") {
+                        continue;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        books.push(LibraryBook {
+            title: book_ref.title.clone(),
+            author: book_ref.authors.as_ref().and_then(|a| a.first()).cloned(),
+            publication_year: book_ref.publication_year,
+            status,
+            has_notes: entry.value.notes.is_some(),
+            book_id,
+        });
+    }
+
+    // Sort alphabetically by title
+    books.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+
+    let template = BookListTemplate {
+        is_authenticated: true,
+        signups_disabled: signups_disabled(),
+        username: user.username,
+        books,
+        filter: query.filter,
+    };
+
+    Html(template.render().unwrap()).into_response()
 }
 
 /// Data needed to sync a book entry to the PDS

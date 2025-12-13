@@ -553,4 +553,25 @@ impl Database {
 
         Ok(book_id)
     }
+
+    /// Find a book by title and author.
+    pub async fn find_book_by_title_author(
+        &self,
+        title: &str,
+        author: Option<&str>,
+    ) -> Result<Option<crate::books::Book>, sqlx::Error> {
+        let row = sqlx::query("SELECT id, title, author, publication_year, created_at FROM books WHERE title = ? AND author IS ?")
+            .bind(title)
+            .bind(author)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        Ok(row.map(|r| crate::books::Book {
+            id: r.get("id"),
+            title: r.get("title"),
+            author: r.get("author"),
+            publication_year: r.get("publication_year"),
+            created_at: r.get("created_at"),
+        }))
+    }
 }
