@@ -31,6 +31,7 @@ pub async fn following_feed_page(State(db): State<AppState>, headers: HeaderMap)
             is_authenticated: true,
             signups_disabled: signups_disabled(),
             username: current.username,
+            current_did: None,
             feed_items: vec![],
         };
         return Html(template.render().unwrap()).into_response();
@@ -42,6 +43,7 @@ pub async fn following_feed_page(State(db): State<AppState>, headers: HeaderMap)
             is_authenticated: true,
             signups_disabled: signups_disabled(),
             username: current.username,
+            current_did: Some(current_did.clone()),
             feed_items: vec![],
         };
         return Html(template.render().unwrap()).into_response();
@@ -56,8 +58,27 @@ pub async fn following_feed_page(State(db): State<AppState>, headers: HeaderMap)
         }
     };
 
-    // Collect feed items from all followed users
+    // Collect feed items from all followed users and the current user
     let mut feed_items: Vec<FeedItem> = Vec::new();
+
+    // Add current user's own entries
+    match pds_client.list_book_entries(current_did).await {
+        Ok(entries) => {
+            for entry in entries {
+                feed_items.push(FeedItem {
+                    entry: entry.value,
+                    author_username: current.username.clone(),
+                    author_did: current_did.clone(),
+                    book_id: None,
+                    in_current_user_library: false,
+                    current_user_status: None,
+                });
+            }
+        }
+        Err(error) => {
+            eprintln!("Error fetching own book entries: {error}");
+        }
+    }
 
     for follow in follows {
         let subject_did = &follow.value.subject;
@@ -101,6 +122,7 @@ pub async fn following_feed_page(State(db): State<AppState>, headers: HeaderMap)
         is_authenticated: true,
         signups_disabled: signups_disabled(),
         username: current.username,
+        current_did: Some(current_did.clone()),
         feed_items,
     };
 

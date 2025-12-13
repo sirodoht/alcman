@@ -115,6 +115,7 @@ pub struct FollowingFeedTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,
+    pub current_did: Option<String>,
     /// Feed items (book entries with author info)
     pub feed_items: Vec<crate::atproto::FeedItem>,
 }
