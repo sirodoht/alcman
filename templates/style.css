@@ -742,3 +742,78 @@ select:focus {
     border-radius: 4px;
     display: inline-block;
 }
+
+/* profile book entries */
+.book-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.book-entry:last-child {
+    border-bottom: none;
+}
+
+.book-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.book-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+    line-height: 1.4;
+}
+
+.book-authors {
+    margin: 0;
+    font-size: 14px;
+    color: #6c757d;
+    line-height: 1.5;
+}
+
+.book-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    font-size: 13px;
+    color: #868e96;
+}
+
+.book-status {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: lowercase;
+}
+
+.book-date {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+    font-size: 12px;
+    color: #868e96;
+}
+
+.book-notes {
+    margin-top: 8px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #495057;
+}
+
+.book-notes p {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}

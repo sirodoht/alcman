@@ -1,5 +1,6 @@
 use askama::Template;
 
+use crate::atproto::BookEntryRecord;
 use crate::books::Book;
 use crate::gpt::{BookEditResult, BookMetadata};
 
