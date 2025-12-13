@@ -653,9 +653,10 @@ select:focus {
 }
 
 .feed-entry-notes {
-    margin-top: 8px;
-    color: #495057;
-    font-size: 14px;
+    margin-top: 12px;
+    color: #000;
+    font-size: 17px;
+    font-weight: 500;
     line-height: 1.6;
     max-height: 200px;
     overflow: hidden;
@@ -667,17 +668,6 @@ select:focus {
     margin: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
-}
-
-.feed-entry-notes::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 40px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.5));
-    pointer-events: none;
 }
 
 .feed-entry-actions {

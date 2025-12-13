@@ -66,6 +66,12 @@
                             {% endif %}
                         </div>
 
+                        {% if let Some(notes) = item.entry.notes %}
+                        <div class="feed-entry-notes">
+                            <p>{{ notes }}</p>
+                        </div>
+                        {% endif %}
+
                         {% if let Some(status) = item.entry.status %}
                         <div class="feed-entry-status-section">
                             {% if status == "reading" %}
@@ -79,12 +85,6 @@
                             {% else %}
                             <span class="feed-entry-status{% if !item.in_current_user_library %} feed-entry-status-outline{% endif %}">{{ status }}</span>
                             {% endif %}
-                        </div>
-                        {% endif %}
-
-                        {% if let Some(notes) = item.entry.notes %}
-                        <div class="feed-entry-notes">
-                            <p>{{ notes }}</p>
                         </div>
                         {% endif %}
 
