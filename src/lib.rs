@@ -33,15 +33,16 @@ pub fn create_app(db: AppState) -> Router {
         book_delete, book_detail, book_edit_chat_apply, book_edit_chat_page, book_edit_chat_submit,
         book_edit_page, book_edit_submit, book_include_page, book_include_save, book_list,
     };
-    use feed::{feed_page, global_feed_page};
+    use feed::{following_feed_page, global_feed_page, home_redirect};
 
     Router::new()
-        .route("/", get(global_feed_page))
+        .route("/", get(home_redirect))
         .route("/books", get(book_list))
         .route("/login", get(login_page).post(login_submit))
         .route("/signup", get(signup_page).post(signup_submit))
         .route("/logout", post(logout))
-        .route("/feed", get(feed_page))
+        .route("/global", get(global_feed_page))
+        .route("/following", get(following_feed_page))
         .route("/profile", get(profile_redirect))
         .route("/profile/{did}", get(profile_by_did_page))
         .route("/profile/{did}/follow", post(follow_user))

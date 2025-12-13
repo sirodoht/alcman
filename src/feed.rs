@@ -9,10 +9,15 @@ use std::collections::HashMap;
 use crate::AppState;
 use crate::atproto::{FeedItem, PdsClient};
 use crate::auth::{current_user, signups_disabled};
-use crate::templates::{FeedTemplate, GlobalFeedTemplate};
+use crate::templates::{FollowingFeedTemplate, GlobalFeedTemplate};
+
+/// Redirect root to /global
+pub async fn home_redirect() -> Redirect {
+    Redirect::to("/global")
+}
 
 /// Show feed page with book entries from followed users
-pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn following_feed_page(State(db): State<AppState>, headers: HeaderMap) -> Response {
     let current = current_user(&db, &headers).await;
 
     // Require authentication
@@ -22,7 +27,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
 
     let Some(current_did) = &current.did else {
         // User doesn't have a DID, show empty feed
-        let template = FeedTemplate {
+        let template = FollowingFeedTemplate {
             is_authenticated: true,
             signups_disabled: signups_disabled(),
             username: current.username,
@@ -33,7 +38,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
 
     let Some(pds_client) = PdsClient::from_env() else {
         // PDS not configured, show empty feed
-        let template = FeedTemplate {
+        let template = FollowingFeedTemplate {
             is_authenticated: true,
             signups_disabled: signups_disabled(),
             username: current.username,
@@ -92,7 +97,7 @@ pub async fn feed_page(State(db): State<AppState>, headers: HeaderMap) -> Respon
     // Sort by created_at descending (most recent first)
     feed_items.sort_by(|a, b| b.entry.created_at.cmp(&a.entry.created_at));
 
-    let template = FeedTemplate {
+    let template = FollowingFeedTemplate {
         is_authenticated: true,
         signups_disabled: signups_disabled(),
         username: current.username,

@@ -110,8 +110,8 @@ pub struct BookEditChatTemplate {
 }
 
 #[derive(Template)]
-#[template(path = "feed.html")]
-pub struct FeedTemplate {
+#[template(path = "following_feed.html")]
+pub struct FollowingFeedTemplate {
     pub is_authenticated: bool,
     pub signups_disabled: bool,
     pub username: String,
