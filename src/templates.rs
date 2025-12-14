@@ -47,6 +47,16 @@ pub struct SignupTemplate {
     pub error_message: Option<String>,
 }
 
+/// A followed user's entry for a book
+pub struct FollowedUserBookEntry {
+    pub username: String,
+    pub did: String,
+    pub status: Option<String>,
+    pub notes: Option<String>,
+    pub started_at: Option<String>,
+    pub finished_at: Option<String>,
+}
+
 #[derive(Template)]
 #[template(path = "book_detail.html")]
 pub struct BookDetailTemplate {
@@ -54,13 +64,14 @@ pub struct BookDetailTemplate {
     pub signups_disabled: bool,
     pub username: String,
     pub book: Book,
-    pub activities: Vec<crate::books::BookActivity>,
     /// Whether this book is in the current user's library
     pub in_current_user_library: bool,
     /// Status in the current user's library (if present)
     pub current_user_status: Option<String>,
     /// Notes from the current user's library (if present)
     pub current_user_notes: Option<String>,
+    /// Entries from followed users who have this book
+    pub followed_users_entries: Vec<FollowedUserBookEntry>,
 }
 
 #[derive(Template)]

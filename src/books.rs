@@ -17,7 +17,7 @@ use crate::gpt::{GptClient, GptConfig};
 use crate::pds::AuthenticatedPds;
 use crate::templates::{
     BookAddTemplate, BookDetailTemplate, BookEditChatTemplate, BookEditTemplate,
-    BookIncludeTemplate, BookListTemplate, BookNotesTemplate, LibraryBook,
+    BookIncludeTemplate, BookListTemplate, BookNotesTemplate, FollowedUserBookEntry, LibraryBook,
 };
 
 /// Check if a model name is a Claude model
@@ -394,11 +394,10 @@ pub async fn book_detail(
         }
     };
 
-    // Fetch activity from PDS
-    let mut activities: Vec<BookActivity> = Vec::new();
     let mut in_current_user_library = false;
     let mut current_user_status: Option<String> = None;
     let mut current_user_notes: Option<String> = None;
+    let mut followed_users_entries: Vec<FollowedUserBookEntry> = Vec::new();
 
     if let Some(pds_client) = PdsClient::from_env() {
         // Check if the current user has this book in their library
@@ -421,56 +420,65 @@ pub async fn book_detail(
             }
         }
 
-        // Get all repositories from the PDS
-        let repos = match pds_client.list_repos(Some(100)).await {
-            Ok(repos) => repos,
-            Err(error) => {
-                eprintln!("Error fetching repos from PDS: {error}");
-                vec![]
-            }
-        };
-
-        for repo in repos {
-            let did = &repo.did;
-
-            // Look up username from local database, or resolve handle from PLC directory
-            let username = match db.get_user_by_did(did).await {
-                Ok(Some(user)) => user.username,
-                _ => {
-                    // Resolve handle from PLC directory (works for any did:plc)
-                    resolve_handle_from_plc(did)
-                        .await
-                        .unwrap_or_else(|| did.clone())
+        // Get list of followed users
+        if let Some(ref did) = current_did {
+            let follows = match pds_client.list_follows(did).await {
+                Ok(follows) => follows,
+                Err(error) => {
+                    eprintln!("Error fetching follows: {error}");
+                    vec![]
                 }
             };
 
-            // Fetch book entries for this repo
-            let entries = match pds_client.list_book_entries(did).await {
-                Ok(entries) => entries,
-                Err(_) => continue,
-            };
+            // Fetch entries from followed users for this book
+            for follow in follows {
+                let subject_did = &follow.value.subject;
 
-            // Check if any entry matches this book
-            for entry in entries {
-                let entry_book = &entry.value.book;
-                if books_match(
-                    &entry_book.title,
-                    entry_book.authors.as_ref(),
-                    &book.title,
-                    book.author.as_deref(),
-                ) {
-                    activities.push(BookActivity {
-                        username: username.clone(),
-                        did: did.clone(),
-                        action: "added".to_string(),
-                        created_at: entry.value.created_at.clone(),
-                    });
+                // Skip if this is the current user
+                if subject_did == did.as_str() {
+                    continue;
+                }
+
+                // Look up user in local database
+                let username = match db.get_user_by_did(subject_did).await {
+                    Ok(Some(user)) => user.username,
+                    Ok(None) => {
+                        // Resolve handle from PLC directory
+                        resolve_handle_from_plc(subject_did)
+                            .await
+                            .unwrap_or_else(|| subject_did.clone())
+                    }
+                    Err(_) => continue,
+                };
+
+                // Fetch book entries for this user
+                let entries = match pds_client.list_book_entries(subject_did).await {
+                    Ok(entries) => entries,
+                    Err(_) => continue,
+                };
+
+                // Check if any entry matches this book
+                for entry in entries {
+                    let entry_book = &entry.value.book;
+                    if books_match(
+                        &entry_book.title,
+                        entry_book.authors.as_ref(),
+                        &book.title,
+                        book.author.as_deref(),
+                    ) {
+                        followed_users_entries.push(FollowedUserBookEntry {
+                            username: username.clone(),
+                            did: subject_did.clone(),
+                            status: entry.value.status.clone(),
+                            notes: entry.value.notes.clone(),
+                            started_at: entry.value.started_at.clone(),
+                            finished_at: entry.value.finished_at.clone(),
+                        });
+                        break; // Only one entry per user
+                    }
                 }
             }
         }
-
-        // Sort by created_at descending (most recent first)
-        activities.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     }
 
     let template = BookDetailTemplate {
@@ -478,10 +486,10 @@ pub async fn book_detail(
         signups_disabled: signups_disabled(),
         username: user.map(|u| u.username).unwrap_or_default(),
         book,
-        activities,
         in_current_user_library,
         current_user_status,
         current_user_notes,
+        followed_users_entries,
     };
     Html(template.render().unwrap()).into_response()
 }

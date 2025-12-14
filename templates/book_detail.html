@@ -3,107 +3,105 @@
 {% block title %}{{ book.title }}{% endblock title %}
 
 {% block content %}
-<section>
-    <div class="page-row">
-        <div class="page-header">
-            <h1>{{ book.title }}</h1>
-            {% if let Some(author) = book.author %}
-            <p class="books-detail-author">{{ author }}</p>
+<section class="book-detail">
+    <!-- Compact hero: title, author, year, status/CTA -->
+    <div class="book-detail-hero">
+        <div class="book-detail-hero-content">
+            <div class="book-detail-hero-main">
+                <h1 class="book-detail-title">{{ book.title }}</h1>
+                <div class="book-detail-meta-line">
+                    {% if let Some(author) = book.author %}
+                    <span class="book-detail-author">by {{ author }}</span>
+                    {% endif %}
+                    {% if let Some(year) = book.publication_year %}
+                    <span class="book-detail-year">{{ year }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% if is_authenticated %}
+            <div class="book-detail-hero-status">
+                {% if in_current_user_library %}
+                    {% if let Some(status) = current_user_status %}
+                    <span class="book-detail-status">
+                        {% if status == "reading" %}reading
+                        {% elif status == "finished" %}finished
+                        {% elif status == "wantToRead" %}want to read
+                        {% elif status == "dropped" %}did not finish
+                        {% else %}{{ status }}{% endif %}
+                    </span>
+                    {% else %}
+                    <span class="book-detail-status">in library</span>
+                    {% endif %}
+                {% else %}
+                <a href="/books/include?title={{ book.title|urlencode }}{% if let Some(author) = book.author %}&amp;author={{ author|urlencode }}{% endif %}{% if let Some(year) = book.publication_year %}&amp;year={{ year }}{% endif %}" class="btn btn-primary">add to library</a>
+                {% endif %}
+            </div>
             {% endif %}
         </div>
     </div>
-
-    {% if let Some(year) = book.publication_year %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Publication Year</span>
-            <span class="page-value">{{ year }}</span>
-        </div>
-    </div>
-    {% endif %}
 
     {% if is_authenticated %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Your Library</span>
-            {% if in_current_user_library %}
-            <span class="feed-entry-in-library">in your library{% if let Some(status) = current_user_status %} ({{ status }}){% endif %}</span>
-            {% else %}
-            <span class="page-value-muted">not in your library</span>
+    <!-- My notes and actions -->
+    {% if in_current_user_library %}
+    <div class="book-detail-panel">
+        <div class="book-detail-panel-content">
+            {% if let Some(notes) = current_user_notes %}
+            <div class="book-detail-notes">
+                <p>{{ notes }}</p>
+            </div>
             {% endif %}
-        </div>
-    </div>
-    {% if let Some(notes) = current_user_notes %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label page-noteslabel">Your Notes</span>
-            <span class="page-notes">{{ notes }}</span>
+            <div class="book-detail-actions">
+                <a href="/books/{{ book.id }}/notes" class="btn">notes</a>
+                <a href="/books/{{ book.id }}/edit" class="btn">edit</a>
+                <a href="/books/{{ book.id }}/edit-chat" class="btn">edit in chat</a>
+                <form method="post" action="/books/{{ book.id }}/delete" onsubmit="return confirm('sure?');">
+                    <button type="submit" class="btn">delete</button>
+                </form>
+            </div>
         </div>
     </div>
     {% endif %}
     {% endif %}
 
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Amazon UK</span>
-            <span class="page-value">
-                <a href="https://www.amazon.co.uk/s?k={{ book.title|urlencode }}{% if let Some(author) = book.author %}+{{ author|urlencode }}{% endif %}" target="_blank">search amz →</a>
-            </span>
-        </div>
-    </div>
-
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">World of Books</span>
-            <span class="page-value">
-                <a href="https://www.worldofbooks.com/en-gb/search?q={{ book.title|urlencode }}{% if let Some(author) = book.author %}+{{ author|urlencode }}{% endif %}" target="_blank">search wob →</a>
-            </span>
-        </div>
-    </div>
-
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-label">Added</span>
-            <span class="page-value">{{ book.created_date() }}</span>
-        </div>
-    </div>
-
-    <div class="page-row">
-        <div class="page-content page-actions">
-            {% if is_authenticated %}
-            {% if in_current_user_library %}
-            <a href="/books/{{ book.id }}/notes" class="btn">notes</a>
-            {% endif %}
-            <a href="/books/{{ book.id }}/edit" class="btn">edit</a>
-            <a href="/books/{{ book.id }}/edit-chat" class="btn">edit in chat</a>
-            <form method="post" action="/books/{{ book.id }}/delete" onsubmit="return confirm('sure?');">
-                <button type="submit" class="btn">delete</button>
-            </form>
-            {% endif %}
-        </div>
-    </div>
-
-    {% if !activities.is_empty() %}
-    <div class="page-row">
-        <div class="page-header">
-            <h2>activity</h2>
-        </div>
-    </div>
-    {% for activity in activities %}
-    <div class="page-row">
-        <div class="page-content">
-            <span class="page-value">
-                {% if activity.username != activity.did %}
-                <a href="/profile/{{ activity.did }}">{{ activity.username }}</a> ({{ activity.did }})
-                {% else %}
-                <a href="/profile/{{ activity.did }}">{{ activity.did }}</a>
+    <!-- People you follow -->
+    {% if !followed_users_entries.is_empty() %}
+    <div class="book-detail-panel">
+        <div class="book-detail-panel-content">
+            <h2 class="book-detail-panel-title">people you follow</h2>
+            {% for entry in followed_users_entries %}
+            <div class="book-detail-followed-entry">
+                <div class="book-detail-followed-header">
+                    <a href="/profile/{{ entry.did }}" class="book-detail-followed-username">{{ entry.username }}</a>
+                    {% if let Some(status) = entry.status %}
+                    <span class="book-detail-followed-status">
+                        {% if status == "reading" %}reading
+                        {% elif status == "finished" %}finished
+                        {% elif status == "wantToRead" %}want to read
+                        {% elif status == "dropped" %}did not finish
+                        {% else %}{{ status }}{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if let Some(notes) = entry.notes %}
+                <div class="book-detail-followed-notes">
+                    <p>{{ notes }}</p>
+                </div>
                 {% endif %}
-                {{ activity.action }} this book on {{ activity.created_date() }}
-            </span>
+            </div>
+            {% endfor %}
         </div>
     </div>
-    {% endfor %}
     {% endif %}
 
+    <!-- Links and metadata -->
+    <div class="book-detail-panel">
+        <div class="book-detail-panel-content">
+            <div class="book-detail-links">
+                <a href="https://www.amazon.co.uk/s?k={{ book.title|urlencode }}{% if let Some(author) = book.author %}+{{ author|urlencode }}{% endif %}" target="_blank" class="book-detail-link">Amazon UK →</a>
+                <a href="https://www.worldofbooks.com/en-gb/search?q={{ book.title|urlencode }}{% if let Some(author) = book.author %}+{{ author|urlencode }}{% endif %}" target="_blank" class="book-detail-link">World of Books →</a>
+                <span class="book-detail-date">added {{ book.created_date() }}</span>
+            </div>
+        </div>
+    </div>
 </section>
 {% endblock content %}

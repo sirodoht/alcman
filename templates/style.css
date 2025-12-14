@@ -342,10 +342,247 @@ select:focus {
 }
 
 /* book detail */
-.books-detail-author {
-    color: #6c757d;
+.book-detail {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+/* Compact hero section */
+.book-detail-hero {
+    background-color: white;
+    padding: 16px 0;
+}
+
+.book-detail-hero-content {
+    max-width: var(--width);
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+}
+@media (max-width: 768px) {
+    .book-detail-hero-content {
+        padding: 0 16px;
+        flex-direction: column;
+        gap: 12px;
+    }
+}
+
+.book-detail-hero-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.book-detail-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a252f;
+    margin: 0 0 6px 0;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+}
+@media (max-width: 768px) {
+    .book-detail-title {
+        font-size: 22px;
+    }
+}
+
+.book-detail-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.book-detail-author {
+    color: #495057;
+    font-size: 15px;
+    margin: 0;
+    font-weight: 400;
+}
+@media (max-width: 768px) {
+    .book-detail-author {
+        font-size: 14px;
+    }
+}
+
+.book-detail-year {
+    color: #868e96;
     font-size: 14px;
     margin: 0;
+    font-variant-numeric: tabular-nums;
+}
+@media (max-width: 768px) {
+    .book-detail-year {
+        font-size: 13px;
+    }
+}
+
+.book-detail-hero-status {
+    flex-shrink: 0;
+}
+
+.book-detail-status {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 18px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: lowercase;
+    letter-spacing: 0.2px;
+    background-color: #212529;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    background-color: #212529;
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background-color: #1a252f;
+}
+
+/* Panel-based layout */
+.book-detail-panel {
+    background-color: white;
+    padding: 12px 0;
+    margin-top: 4px;
+}
+
+.book-detail-panel-content {
+    max-width: var(--width);
+    margin: 0 auto;
+    padding: 0 24px;
+}
+@media (max-width: 768px) {
+    .book-detail-panel-content {
+        padding: 0 16px;
+    }
+}
+
+.book-detail-panel-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0 0 10px 0;
+    text-transform: lowercase;
+}
+
+.book-detail-notes {
+    margin: 0 0 12px 0;
+    color: #000;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.6;
+    padding: 0;
+}
+
+.book-detail-notes p {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.book-detail-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 0;
+}
+
+.book-detail-actions .btn {
+    padding: 4px 12px;
+    font-size: 13px;
+    height: auto;
+}
+
+/* Followed users */
+.book-detail-followed-entry {
+    margin-top: 12px;
+}
+
+.book-detail-followed-entry:first-child {
+    margin-top: 0;
+}
+
+.book-detail-followed-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+
+.book-detail-followed-username {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3e50;
+    text-decoration: none;
+}
+
+.book-detail-followed-username:hover {
+    text-decoration: underline;
+}
+
+.book-detail-followed-status {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 14px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: lowercase;
+    background-color: #e9ecef;
+    color: #495057;
+    border: 1px solid #dee2e6;
+}
+
+.book-detail-followed-notes {
+    margin-top: 6px;
+    color: #495057;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 0;
+}
+
+.book-detail-followed-notes p {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Links and metadata */
+.book-detail-links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.book-detail-link {
+    color: #495057;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.book-detail-link:hover {
+    color: #2c3e50;
+    text-decoration: underline;
+}
+
+.book-detail-date {
+    color: #868e96;
+    font-size: 13px;
+    margin-left: auto;
+}
+@media (max-width: 768px) {
+    .book-detail-date {
+        margin-left: 0;
+        width: 100%;
+    }
 }
 
 @media (max-width: 500px) {
@@ -359,10 +596,6 @@ select:focus {
     text-align: left;
     max-width: var(--width);
     line-height: 1.2;
-}
-
-.books-detail-info {
-    margin-bottom: 32px;
 }
 
 /* edit chat */
